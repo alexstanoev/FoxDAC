@@ -1,0 +1,29 @@
+/*
+ * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+#include <stdio.h>
+
+#include "pico/stdlib.h"
+#include "pico/usb_device.h"
+#include "pico/multicore.h"
+
+#include "usb_spdif.h"
+
+int main(void) {
+    set_sys_clock_48mhz();
+
+    stdout_uart_init();
+
+    //gpio_debug_pins_init();
+    puts("USB SOUND CARD");
+
+    usb_spdif_audio_init();
+
+    //multicore_launch_core1(core1_worker);
+    //printf("HAHA %04x %04x %04x %04x\n", MIN_VOLUME, DEFAULT_VOLUME, MAX_VOLUME, VOLUME_RESOLUTION);
+    // MSD is irq driven
+    while (1) __wfi();
+}
