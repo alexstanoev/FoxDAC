@@ -11,7 +11,10 @@
 #include "pico/audio.h"
 #include "pico/audio_spdif.h"
 #include "pico/multicore.h"
+#include "hardware/sync.h"
 #include "lufa/AudioClassCommon.h"
+
+#include "ui.h"
 
 // todo forget why this is using core 1 for sound: presumably not necessary
 // todo noop when muted
@@ -24,8 +27,8 @@ CU_REGISTER_DEBUG_PINS(audio_timing)
 // todo make descriptor strings should probably belong to the configs
 static char *descriptor_strings[] =
         {
-                "Raspberry Pi",
-                "Pico Examples Sound Card",
+                "astanoev.com",
+                "FoxDAC",
                 "0123456789AB"
         };
 
@@ -581,7 +584,21 @@ void usb_sound_card_init() {
 }
 
 static void core1_worker() {
+	uint32_t primask = save_and_disable_interrupts();
+	// the OLED gets upset if it gets interrupted during init
+	ui_init();
+	restore_interrupts(primask);
+
+	// start up PIO SPDIF
     audio_spdif_set_enabled(true);
+
+    while(1) {
+    	puts("looping");
+        tight_loop_contents();
+
+        //ui_init();
+        ui_loop();
+    }
 }
 
 int main(void) {
@@ -631,10 +648,10 @@ int main(void) {
     assert(ok);
     usb_sound_card_init();
 
-    //audio_spdif_set_enabled(true);
-
     multicore_launch_core1(core1_worker);
     printf("HAHA %04x %04x %04x %04x\n", MIN_VOLUME, DEFAULT_VOLUME, MAX_VOLUME, VOLUME_RESOLUTION);
     // MSD is irq driven
+    //while (1) __wfi();
+
     while (1) __wfi();
 }
