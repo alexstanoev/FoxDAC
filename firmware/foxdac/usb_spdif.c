@@ -14,7 +14,7 @@
 #include "hardware/sync.h"
 #include "lufa/AudioClassCommon.h"
 
-#include "ui.h"
+#include "ui/ui.h"
 
 // todo forget why this is using core 1 for sound: presumably not necessary
 // todo noop when muted
@@ -593,7 +593,7 @@ static void core1_worker() {
     audio_spdif_set_enabled(true);
 
     while(1) {
-    	puts("looping");
+    	//puts("looping");
         tight_loop_contents();
 
         //ui_init();

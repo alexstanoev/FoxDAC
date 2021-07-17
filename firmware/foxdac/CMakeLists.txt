@@ -3,10 +3,10 @@ if (TARGET usb_device)
 
     add_executable(foxdac
             usb_spdif.c
-            ui.c
             )
             
     add_subdirectory(drivers)
+    add_subdirectory(ui)
 
     target_compile_definitions(foxdac PRIVATE
             AUDIO_FREQ_MAX=48000
@@ -23,6 +23,6 @@ if (TARGET usb_device)
             PICO_AUDIO_SPDIF_PIN=9
     )
 
-    target_link_libraries(foxdac ssd1306_driver pico_stdlib usb_device pico_audio_spdif pico_multicore hardware_i2c)
+    target_link_libraries(foxdac dac_ui ssd1306_driver pico_stdlib usb_device pico_audio_spdif pico_multicore hardware_i2c)
     pico_add_extra_outputs(foxdac)
 endif()

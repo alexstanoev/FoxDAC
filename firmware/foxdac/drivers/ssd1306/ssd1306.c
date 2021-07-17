@@ -57,7 +57,7 @@ void ssd1306_Init(void) {
     ssd1306_SetDisplayOn(0); //display off
 
     ssd1306_WriteCommand(0x20); //Set Memory Addressing Mode
-    ssd1306_WriteCommand(0x00); // 00b,Horizontal Addressing Mode; 01b,Vertical Addressing Mode;
+    ssd1306_WriteCommand(0x02); // 00b,Horizontal Addressing Mode; 01b,Vertical Addressing Mode;
                                 // 10b,Page Addressing Mode (RESET); 11b,Invalid
 
     ssd1306_WriteCommand(0xB0); //Set Page Start Address for Page Addressing Mode,0-7
@@ -157,6 +157,8 @@ void ssd1306_Fill(SSD1306_COLOR color) {
     }
 }
 
+static uint8_t zerobuf[2] = { 0 };
+
 // Write the screenbuffer with changed to the screen
 void ssd1306_UpdateScreen(void) {
     // Write data to each page of RAM. Number of pages
@@ -170,6 +172,7 @@ void ssd1306_UpdateScreen(void) {
         ssd1306_WriteCommand(0x00);
         ssd1306_WriteCommand(0x10);
         ssd1306_WriteData(&SSD1306_Buffer[SSD1306_WIDTH*i],SSD1306_WIDTH);
+        ssd1306_WriteData(zerobuf, 2); // clear last two cols
     }
 }
 
