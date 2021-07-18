@@ -16,6 +16,8 @@
 #include "lvgl/lvgl.h"
 #include "lv_port_disp.h"
 
+#include "dac_lvgl_ui.h"
+
 static void lv_init_ui(void) {
 	lv_init();
     lv_port_disp_init();
@@ -88,8 +90,9 @@ void ui_init(void) {
     encoder_init();
 
     //lv_btn_create(lv_scr_act());
-    lv_example_anim_2();
+    //lv_example_anim_2();
 
+    DAC_BuildPages();
 
     badapple_init();
     badapple_start();
