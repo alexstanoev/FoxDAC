@@ -62,7 +62,7 @@ void badapple_stop(void)
 static void badapple_next_frame(lv_timer_t * timer) {
     extern uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
 
-    int32_t rle_len = (((int32_t)badapple[fr_byte_idx - 2]) << 8) | ((int32_t) badapple[fr_byte_idx - 1]);
+    int32_t rle_len = (((int32_t) badapple[fr_byte_idx - 2]) << 8) | ((int32_t) badapple[fr_byte_idx - 1]);
 
     rle_decode(SSD1306_Buffer, &badapple[fr_byte_idx], rle_len);
     fr_byte_idx += rle_len + 2;
@@ -78,6 +78,6 @@ static void badapple_next_frame(lv_timer_t * timer) {
 }
 
 void badapple_init(void) {
-    timer = lv_timer_create(badapple_next_frame, 33, NULL); // 33ms per frame
+    timer = lv_timer_create(badapple_next_frame, 42, NULL); // 24fps = 41.6ms
     lv_timer_pause(timer);
 }
