@@ -95,7 +95,7 @@ void ui_init(void) {
     DAC_BuildPages();
 
     badapple_init();
-    badapple_start();
+    //badapple_start();
 }
 
 void ui_loop(void) {
