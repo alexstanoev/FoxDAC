@@ -584,16 +584,16 @@ void usb_sound_card_init() {
 }
 
 static void core1_worker() {
-	uint32_t primask = save_and_disable_interrupts();
-	// the OLED gets upset if it gets interrupted during init
-	ui_init();
-	restore_interrupts(primask);
+    uint32_t primask = save_and_disable_interrupts();
+    // the OLED gets upset if it gets interrupted during init
+    ui_init();
+    restore_interrupts(primask);
 
-	// start up PIO SPDIF
+    // start up PIO SPDIF
     audio_spdif_set_enabled(true);
 
     while(1) {
-    	//puts("looping");
+        //puts("looping");
         tight_loop_contents();
 
         //ui_init();

@@ -75,7 +75,6 @@ void lv_example_anim_2(void)
 
 
 void ui_init(void) {
-	//i2c_deinit(SSD1306_I2C_PORT);
     i2c_init(SSD1306_I2C_PORT, 400 * 1000);
     gpio_set_function(14, GPIO_FUNC_I2C); // GP14
     gpio_set_function(15, GPIO_FUNC_I2C); // GP15
@@ -83,7 +82,6 @@ void ui_init(void) {
     gpio_pull_up(15);
 
     ssd1306_Init();
-    ssd1306_TestFonts();
 
     lv_init_ui();
 
@@ -97,6 +95,6 @@ void ui_init(void) {
 void ui_loop(void) {
 	//ssd1306_TestAll();
 	lv_task_handler();
-	printf("enc: %d\n", encoder_get_count());
+	//printf("enc: %d\n", encoder_get_count());
 	sleep_ms(5);
 }
