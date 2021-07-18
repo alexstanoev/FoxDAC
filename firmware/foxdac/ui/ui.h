@@ -12,4 +12,8 @@
 void ui_init(void);
 void ui_loop(void);
 
+void badapple_init(void);
+void badapple_start(void);
+void badapple_stop(void);
+
 #endif /* FOXDAC_UI_H_ */

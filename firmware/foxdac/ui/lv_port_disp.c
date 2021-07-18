@@ -42,6 +42,8 @@ static void set_px_cb(struct _lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_
  *  STATIC VARIABLES
  **********************/
 
+uint8_t lv_port_pause_drawing = 0;
+
 /**********************
  *      MACROS
  **********************/
@@ -152,7 +154,6 @@ static void disp_init(void)
 static void set_px_cb(struct _lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y,
         lv_color_t color, lv_opa_t opa)
 {
-
     // Draw in the right color
     if(color.full == 1) {
         buf[x + (y / 8) * buf_w] |= 1 << (y % 8);
@@ -166,19 +167,21 @@ static void set_px_cb(struct _lv_disp_drv_t * disp_drv, uint8_t * buf, lv_coord_
  *'lv_disp_flush_ready()' has to be called when finished.*/
 static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
 {
-    uint8_t row1 = area->y1>>3;
-    uint8_t row2 = area->y2>>3;
-    uint8_t *buf = (uint8_t*) color_p;
+    if(!lv_port_pause_drawing) {
+        uint8_t row1 = area->y1>>3;
+        uint8_t row2 = area->y2>>3;
+        uint8_t *buf = (uint8_t*) color_p;
 
-    for(uint8_t row = row1; row <= row2; row++) {
-        uint16_t col = area->x1 + 2; // skip first two rows (display ignores them)
-        ssd1306_WriteCommand(0xB0 | row); // Set the current RAM page address.
-        ssd1306_WriteCommand(0x00 | (col & 0xF));
-        ssd1306_WriteCommand(0x10 | ((col>>4) & 0xF));
+        for(uint8_t row = row1; row <= row2; row++) {
+            uint16_t col = area->x1 + 2; // skip first two rows (display ignores them)
+            ssd1306_WriteCommand(0xB0 | row); // Set the current RAM page address.
+            ssd1306_WriteCommand(0x00 | (col & 0xF));
+            ssd1306_WriteCommand(0x10 | ((col>>4) & 0xF));
 
-        ssd1306_WriteData(buf, (area->x2 - area->x1) + 1);
+            ssd1306_WriteData(buf, (area->x2 - area->x1) + 1);
 
-        buf += (area->x2 - area->x1) + 1;
+            buf += (area->x2 - area->x1) + 1;
+        }
     }
 
     /* IMPORTANT!!!

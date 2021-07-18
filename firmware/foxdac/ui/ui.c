@@ -90,11 +90,14 @@ void ui_init(void) {
     //lv_btn_create(lv_scr_act());
     lv_example_anim_2();
 
+
+    badapple_init();
+    badapple_start();
 }
 
 void ui_loop(void) {
 	//ssd1306_TestAll();
 	lv_task_handler();
 	//printf("enc: %d\n", encoder_get_count());
-	sleep_ms(5);
+	sleep_ms(3);
 }
