@@ -4,7 +4,6 @@ import sys
 import os
 import subprocess
 import re
-import example_list as ex
 
 langs = ['en']
 
@@ -26,10 +25,6 @@ def cmd(s):
 status, br = subprocess.getstatusoutput("git branch | grep '*'")
 _, gitcommit = subprocess.getstatusoutput("git rev-parse HEAD")
 br = re.sub('\* ', '', br)
-
-# Generate the list of examples
-ex.exec()
-
 urlpath = re.sub('release/', '', br)
  
 # Be sure the github links point to the right branch

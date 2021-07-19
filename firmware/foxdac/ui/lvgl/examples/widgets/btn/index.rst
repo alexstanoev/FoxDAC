@@ -1,3 +1,5 @@
+C
+^
 
 Simple Buttons 
 """"""""""""""""
@@ -18,3 +20,7 @@ Gummy button
 .. lv_example:: widgets/btn/lv_example_btn_3
   :language: c
 
+MicroPython
+^^^^^^^^^^^
+
+No examples yet.

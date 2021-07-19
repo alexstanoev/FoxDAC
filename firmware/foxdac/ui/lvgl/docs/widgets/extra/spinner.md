@@ -19,8 +19,6 @@ To create a spinner use `lv_spinner_create(parent, spin_time, arc_length)`. `spi
 ## Events
 No special events are sent the the Spinner.
 
-See the events of the [Arc](/widgets/core/arc) too.
-
 Learn more about [Events](/overview/event).
 
 ## Keys

@@ -165,12 +165,10 @@ static void lv_led_event(const lv_obj_class_t * class_p, lv_event_t * e)
     lv_res_t res;
 
     /* Call the ancestor's event handler */
-    lv_event_code_t code = lv_event_get_code(e);
-    if(code != LV_EVENT_DRAW_MAIN && code != LV_EVENT_DRAW_MAIN_END) {
-        res = lv_obj_event_base(MY_CLASS, e);
-        if(res != LV_RES_OK) return;
-    }
+    res = lv_obj_event_base(MY_CLASS, e);
+    if(res != LV_RES_OK) return;
 
+    lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
     if(code == LV_EVENT_DRAW_MAIN) {
         /*Make darker colors in a temporary style according to the brightness*/
@@ -202,18 +200,7 @@ static void lv_led_event(const lv_obj_class_t * class_p, lv_event_t * e)
                 (LV_LED_BRIGHT_MAX - LV_LED_BRIGHT_MIN);
 
         const lv_area_t * clip_area = lv_event_get_param(e);
-
-        lv_obj_draw_part_dsc_t  part_draw_dsc;
-        lv_obj_draw_dsc_init(&part_draw_dsc, clip_area);
-        part_draw_dsc.draw_area = &obj->coords;
-        part_draw_dsc.class_p = MY_CLASS;
-        part_draw_dsc.type = LV_LED_DRAW_PART_RECTANGLE;
-        part_draw_dsc.rect_dsc = &rect_dsc;
-        part_draw_dsc.part = LV_PART_MAIN;
-
-        lv_event_send(obj, LV_EVENT_DRAW_PART_BEGIN, &part_draw_dsc);
         lv_draw_rect(&obj->coords, clip_area, &rect_dsc);
-        lv_event_send(obj, LV_EVENT_DRAW_PART_END, &part_draw_dsc);
     }
 }
 

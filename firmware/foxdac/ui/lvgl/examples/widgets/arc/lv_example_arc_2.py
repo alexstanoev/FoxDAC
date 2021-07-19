@@ -1,37 +1,43 @@
-#
-# An `lv_timer` to call periodically to set the angles of the arc
-#
-class ArcLoader():
-    def __init__(self):
-        self.a = 270
-        
-    def arc_loader_cb(self,tim,arc):
-        # print(tim,arc)
-        self.a += 5
-
-        arc.set_end_angle(self.a)
-
-        if self.a >= 270 + 360:
-            tim._del()
-
-
-#
 # Create an arc which acts as a loader.
-#
+class loader_arc(lv.arc):
 
-# Create an Arc
-arc = lv.arc(lv.scr_act())
-arc.set_bg_angles(0, 360)
-arc.set_angles(270, 270)
-arc.center()
+    def __init__(self, parent, color=lv.color_hex(0x000080), 
+                       width=8, style=lv.style_plain, rate=20):
+        super().__init__(parent)
+        
+        self.a = 0
+        self.rate = rate
 
-# create the loader
-arc_loader = ArcLoader()
+        # Create style for the Arcs
+        self.style = lv.style_t()
+        lv.style_copy(self.style, style)
+        self.style.line.color = color
+        self.style.line.width = width
 
-# Create an `lv_timer` to update the arc.
+        # Create an Arc
+        self.set_angles(180, 180);
+        self.set_style(self.STYLE.MAIN, self.style);
 
-timer = lv.timer_create_basic()
-timer.set_period(20)
-timer.set_cb(lambda src: arc_loader.arc_loader_cb(timer,arc))
-  
+        # Spin the Arc
+        self.spin()
 
+    def spin(self):
+        # Create an `lv_task` to update the arc.
+        lv.task_create(self.task_cb, self.rate, lv.TASK_PRIO.LOWEST, {})
+
+    
+    # An `lv_task` to call periodically to set the angles of the arc
+    def task_cb(self, task):
+        self.a+=5;
+        if self.a >= 359: self.a = 359
+
+        if self.a < 180: self.set_angles(180-self.a, 180)
+        else: self.set_angles(540-self.a, 180)
+
+        if self.a == 359:
+            self.a = 0
+            lv.task_del(task)
+
+# Create a loader arc
+loader_arc = loader_arc(lv.scr_act())
+loader_arc.align(None, lv.ALIGN.CENTER, 0, 0)

@@ -335,7 +335,7 @@ const char * lv_dropdown_get_options(const lv_obj_t * obj)
     LV_ASSERT_OBJ(obj, MY_CLASS);
 
     lv_dropdown_t * dropdown = (lv_dropdown_t *)obj;
-    return dropdown->options == NULL ? "" : dropdown->options;
+    return dropdown->options;
 }
 
 uint16_t lv_dropdown_get_selected(const lv_obj_t * obj)
@@ -615,14 +615,10 @@ static void lv_dropdown_event(const lv_obj_class_t * class_p, lv_event_t * e)
         /*Encoders need special handling*/
         if(indev_type == LV_INDEV_TYPE_ENCODER) {
             /*Open the list if editing*/
-            if(editing) {
-                lv_dropdown_open(obj);
-            }
+            if(editing) lv_dropdown_open(obj);
             /*Close the list if navigating*/
-            else {
-                dropdown->sel_opt_id = dropdown->sel_opt_id_orig;
+            else
                 lv_dropdown_close(obj);
-            }
         }
     }
     else if(code == LV_EVENT_DEFOCUSED || code == LV_EVENT_LEAVE) {

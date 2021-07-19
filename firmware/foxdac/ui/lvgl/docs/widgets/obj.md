@@ -104,10 +104,10 @@ There are some attributes which can be enabled/disabled by `lv_obj_add/clear_fla
 - `LV_OBJ_FLAG_SCROLLABLE`  Make the object scrollable
 - `LV_OBJ_FLAG_SCROLL_ELASTIC`  Allow scrolling inside but with slower speed
 - `LV_OBJ_FLAG_SCROLL_MOMENTUM`  Make the object scroll further when "thrown"
-- `LV_OBJ_FLAG_SCROLL_ONE` Allow scrolling only one snappable children
+- `LV_OBJ_FLAG_SCROLL_ONE` Allow scrolling only one snapable children
 - `LV_OBJ_FLAG_SCROLL_CHAIN`  Allow propagating the scroll to a parent
 - `LV_OBJ_FLAG_SCROLL_ON_FOCUS`  Automatically scroll object to make it visible when focused
-- `LV_OBJ_FLAG_SNAPPABLE` If scroll snap is enabled on the parent it can snap to this object
+- `LV_OBJ_FLAG_SNAPABLE` If scroll snap is enabled on the parent it can snap to this object
 - `LV_OBJ_FLAG_PRESS_LOCK` Keep the object pressed even if the press slid from the object
 - `LV_OBJ_FLAG_EVENT_BUBBLE` Propagate the events to the parent too
 - `LV_OBJ_FLAG_GESTURE_BUBBLE` Propagate the gestures to the parent
@@ -149,19 +149,6 @@ By default, the objects can be clicked only on their coordinates, however, this 
 
 ## Events
 - `LV_EVENT_VALUE_CHANGED` when the `LV_OBJ_FLAG_CHECKABLE` flag is enabled and the object clicked (on transition to/from the checked state)
-- `LV_EVENT_DRAW_PART_BEGIN` and `LV_EVENT_DRAW_PART_END` is sent for the following types:
-    - `LV_OBJ_DRAW_PART_RECTANGLE` The main rectangle
-       - `part`: `LV_PART_MAIN`
-       - `rect_dsc`
-       - `draw_area`: the area of the rectangle
-    - `LV_OBJ_DRAW_PART_BORDER_POST`  The border if the `border_post` style property is `true`
-       - `part`: `LV_PART_MAIN`
-       - `rect_dsc`
-       - `draw_area`: the area of the rectangle
-    - `LV_OBJ_DRAW_PART_SCROLLBAR` the scrollbars
-       - `part`: `LV_PART_SCROLLBAR`
-       - `rect_dsc`
-       - `draw_area`: the area of the rectangle
 
 Learn more about [Events](/overview/event).
 

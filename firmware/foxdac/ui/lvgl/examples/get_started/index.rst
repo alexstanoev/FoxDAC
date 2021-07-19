@@ -1,3 +1,5 @@
+C
+^
 
 A button with a label and react on click event
 """""""""""""""""""""""""""""""""""""""""""""""""
@@ -16,3 +18,7 @@ Create a slider and write its value on a label
   :language: c
 
   
+MicroPython
+^^^^^^^^^^^
+
+No examples yet.

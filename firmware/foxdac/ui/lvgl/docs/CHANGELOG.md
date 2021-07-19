@@ -1,11 +1,5 @@
 # Changelog
 
-## v8.1.0 (In progress)
-- feat(obj) add lv_obj_del_delayed() <a href="https://github.com/lvgl/lvgl/commit/c6a2e15e">c6a2e15e</a> 
-- feat(timer) check if lv_tick_inc is called <a href="https://github.com/lvgl/lvgl/commit/aa6641a6">aa6641a6</a> 
-- feat(docs) add view on GitHub link <a href="https://github.com/lvgl/lvgl/commit/a716ac6e">a716ac6e</a> 
-- feat(event) pass the scroll aniamtion to LV_EVENT_SCROLL_BEGIN <a href="https://github.com/lvgl/lvgl/commit/ca54ecfe">ca54ecfe</a> 
-
 ## v8.0.1 (14.06.2021)
 - docs(filesystem) update to v8 <a href="https://github.com/lvgl/lvgl/commit/7971ade4">7971ade4</a> 
 - fix(msgbox) create modals on top layer instead of act screen <a href="https://github.com/lvgl/lvgl/commit/5cf6303e">5cf6303e</a> 
@@ -102,7 +96,7 @@ v8 is a major change and therefore it's not backward compatible with v7.
 
 ### Driver changes
 - `lv_disp_drv_t`, `lv_indev_drv_t`, `lv_fs_drv_t` needs to be `static`
-- `...disp_buf...` is renamed to `draw_buf`. See an initialization example [here](https://github.com/lvgl/lv_sim_eclipse_sdl/blob/release/v8.0/main.c#L128-L141).
+- `...disp_buf...` is renamed to `draw_buf`. See an initialization example [here](https://github.com/lvgl/lv_sim_eclipse_sdl/blob/e164e3591c3e1e3bf3464d19e0dcdc67b2e6a791/main.c#L87-L97).
 - No partial update if two screen sized buffers are set
 - `disp_drv->full_refresh = 1` makes always the whole display redraw. 
 - `hor_res` and `ver_res` need to be set in `disp_drv`
@@ -132,7 +126,6 @@ v8 is a major change and therefore it's not backward compatible with v7.
   - Update the events
   - Use the new layouts instead of `lv_cont` features
   - Use `lv_obj` instead of `lv_page`
-  - See the changes in [Colors](https://docs.lvgl.io/8.0/overview/color.html)
   - The other parts are mainly minor renames and refactoring. See the functions' documentation for descriptions. 
 
 ## v7.11.0 (16.03.2021)

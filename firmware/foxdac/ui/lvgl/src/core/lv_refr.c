@@ -184,7 +184,7 @@ void _lv_disp_refr_timer(lv_timer_t * tmr)
     TRACE_REFR("begin");
 
     uint32_t start = lv_tick_get();
-    volatile uint32_t elaps = 0;
+    uint32_t elaps = 0;
 
     disp_refr = tmr->user_data;
 
@@ -488,12 +488,8 @@ static void lv_refr_area_part(const lv_area_t * area_p)
 {
     lv_disp_draw_buf_t * draw_buf = lv_disp_get_draw_buf(disp_refr);
 
-    /* Below the `area_p` area will be redrawn into the draw buffer.
-     * In single buffered mode wait here until the buffer is freed.*/
-    if(draw_buf->buf1 && !draw_buf->buf2) {
-		while(draw_buf->flushing) {
-			if(disp_refr->driver->wait_cb) disp_refr->driver->wait_cb(disp_refr->driver);
-		}
+    while(draw_buf->flushing) {
+        if(disp_refr->driver->wait_cb) disp_refr->driver->wait_cb(disp_refr->driver);
     }
 
     lv_obj_t * top_act_scr = NULL;
@@ -584,8 +580,7 @@ static lv_obj_t * lv_refr_get_top_obj(const lv_area_t * area_p, lv_obj_t * obj)
         if(info.res == LV_COVER_RES_MASKED) return NULL;
 
         uint32_t i;
-        uint32_t child_cnt = lv_obj_get_child_cnt(obj);
-        for(i = 0; i < child_cnt; i++) {
+        for(i = 0; i < lv_obj_get_child_cnt(obj); i++) {
             lv_obj_t * child = lv_obj_get_child(obj, i);
             found_p = lv_refr_get_top_obj(area_p, child);
 
@@ -632,8 +627,7 @@ static void lv_refr_obj_and_children(lv_obj_t * top_p, const lv_area_t * mask_p)
     while(par != NULL) {
         bool go = false;
         uint32_t i;
-        uint32_t child_cnt = lv_obj_get_child_cnt(par);
-        for(i = 0; i < child_cnt; i++) {
+        for(i = 0; i < lv_obj_get_child_cnt(par); i++) {
             lv_obj_t * child = lv_obj_get_child(par, i);
             if(!go) {
                 if(child == border_p) go = true;
@@ -705,8 +699,7 @@ static void lv_refr_obj(lv_obj_t * obj, const lv_area_t * mask_ori_p)
             lv_area_t mask_child; /*Mask from obj and its child*/
             lv_area_t child_area;
             uint32_t i;
-            uint32_t child_cnt = lv_obj_get_child_cnt(obj);
-            for(i = 0; i < child_cnt; i++) {
+            for(i = 0; i < lv_obj_get_child_cnt(obj); i++) {
                 lv_obj_t * child = lv_obj_get_child(obj, i);
                 lv_obj_get_coords(child, &child_area);
                 ext_size = _lv_obj_get_ext_draw_size(child);
@@ -900,22 +893,14 @@ static void draw_buf_flush(void)
     lv_disp_draw_buf_t * draw_buf = lv_disp_get_draw_buf(disp_refr);
     lv_color_t * color_p = draw_buf->buf_act;
 
+    draw_buf->flushing = 1;
+
+    if(disp_refr->driver->draw_buf->last_area && disp_refr->driver->draw_buf->last_part) draw_buf->flushing_last = 1;
+    else draw_buf->flushing_last = 0;
+
     /*Flush the rendered content to the display*/
     lv_disp_t * disp = _lv_refr_get_disp_refreshing();
     if(disp->driver->gpu_wait_cb) disp->driver->gpu_wait_cb(disp->driver);
-
-     /* In double buffered mode wait until the other buffer is freed
-	  * and driver is ready to receive the new buffer */
-	 if(draw_buf->buf1 && draw_buf->buf2) {
-		 while(draw_buf->flushing) {
-			 if(disp_refr->driver->wait_cb) disp_refr->driver->wait_cb(disp_refr->driver);
-		 }
-	 }
-
-	 draw_buf->flushing = 1;
-
-	if(disp_refr->driver->draw_buf->last_area && disp_refr->driver->draw_buf->last_part) draw_buf->flushing_last = 1;
-	else draw_buf->flushing_last = 0;
 
     if(disp->driver->flush_cb) {
         /*Rotate the buffer to the display's native orientation if necessary*/

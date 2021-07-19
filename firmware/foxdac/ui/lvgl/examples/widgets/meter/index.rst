@@ -1,3 +1,5 @@
+C
+^
 
 Simple meter
 """""""""""""""""""""""
@@ -26,3 +28,7 @@ Pie chart
 .. lv_example:: widgets/meter/lv_example_meter_4
   :language: c
 
+MicroPython
+^^^^^^^^^^^
+
+No examples yet.
