@@ -432,6 +432,9 @@ static void audio_set_volume(int16_t volume) {
     volume += CENTER_VOLUME_INDEX * 256;
     if (volume < 0) volume = 0;
     if (volume >= count_of(db_to_vol) * 256) volume = count_of(db_to_vol) * 256 - 1;
+
+    UI_SetVolume(((uint16_t)volume) >> 8u); // 0 to 23296 -> 0 to 91
+
     audio_state.vol_mul = db_to_vol[((uint16_t)volume) >> 8u];
 //    printf("VOL MUL %04x\n", audio_state.vol_mul);
 }

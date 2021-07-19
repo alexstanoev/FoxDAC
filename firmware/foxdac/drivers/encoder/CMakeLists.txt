@@ -4,7 +4,7 @@ target_sources(encoder-pio INTERFACE
   ${CMAKE_CURRENT_LIST_DIR}/encoder.c
 )
 
-pico_generate_pio_header(encoder-pio ${CMAKE_CURRENT_LIST_DIR}/quadrature_encoder.pio)
+pico_generate_pio_header(encoder-pio ${CMAKE_CURRENT_LIST_DIR}/encoder.pio)
 
 target_include_directories(encoder-pio INTERFACE ${CMAKE_CURRENT_LIST_DIR})
 

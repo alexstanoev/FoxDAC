@@ -14,6 +14,8 @@ lv_obj_t * OpticalImg3;
 lv_obj_t * Logo;
 lv_obj_t * LogoImg;
 
+static uint8_t ui_inited = 0;
+
 ///////////////////// IMAGES ////////////////////
 LV_IMG_DECLARE(img_speaker_png);   // assets/speaker.png
 LV_IMG_DECLARE(img_usb_png);   // assets/usb.png
@@ -27,6 +29,13 @@ LV_IMG_DECLARE(img_fox_logo_png);   // assets/fox_logo.png
 ///////////////////// FUNCTIONS2 ////////////////////
 static void VolumeSlider_eventhandler(lv_obj_t * obj, lv_event_t event)
 {
+}
+
+void UI_SetVolume(int32_t vol)
+{
+    if(!ui_inited) return;
+    printf("v: %d\n", vol);
+    lv_slider_set_value(VolumeSlider, vol, LV_ANIM_ON);
 }
 
 ///////////////////// SCREENS ////////////////////
@@ -48,7 +57,7 @@ void DAC_BuildPages(void)
     lv_obj_set_style_outline_width(VolumeSlider, 0, LV_STATE_FOCUSED);
     lv_obj_set_style_border_width(VolumeSlider, 1, LV_STATE_EDITED);
     lv_obj_set_style_outline_width(VolumeSlider, 0, LV_STATE_EDITED);
-    lv_slider_set_range(VolumeSlider, 0, 100);
+    lv_slider_set_range(VolumeSlider, 0, 91);
     lv_slider_set_mode(VolumeSlider, LV_BAR_MODE_NORMAL);
     lv_slider_set_value(VolumeSlider, 25, LV_ANIM_OFF);
     lv_slider_set_left_value(VolumeSlider, 0, LV_ANIM_OFF);
@@ -135,11 +144,19 @@ void DAC_BuildPages(void)
     lv_indev_set_group(indev_encoder, EncGroup);
     lv_group_set_editing(EncGroup, true);
 
+    // assign buttons to input list
+    lv_group_t * InputGroup = lv_group_create();
+    lv_group_add_obj(InputGroup, UsbImg);
+    lv_group_add_obj(InputGroup, OpticalImg1);
+    lv_group_add_obj(InputGroup, OpticalImg2);
+    lv_group_add_obj(InputGroup, OpticalImg3);
+
     // init
 
     lv_scr_load_anim(Logo, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
 
     lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_MOVE_TOP, 300, 3000, false);
 
+    ui_inited = 1;
 }
 

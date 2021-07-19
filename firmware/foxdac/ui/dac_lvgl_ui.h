@@ -27,6 +27,7 @@ LV_IMG_DECLARE(img_toslink_2_png);   // assets/toslink_2.png
 LV_IMG_DECLARE(img_toslink_3_png);   // assets/toslink_3.png
 LV_IMG_DECLARE(img_fox_logo_png);   // assets/fox_logo.png
 
+void UI_SetVolume(int32_t vol);
 void DAC_BuildPages(void);
 
 #ifdef __cplusplus
