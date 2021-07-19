@@ -43,12 +43,12 @@ void encoder_init(void) {
 	quadrature_encoder_program_init(pio, sm, offset, PIN_AB, 0);
 }
 
-int32_t encoder_get_count(void) {
+int32_t encoder_get_delta(void) {
 	new_value = quadrature_encoder_get_count(pio, sm);
 	delta = new_value - old_value;
 	old_value = new_value;
 
-	printf("position %8d, delta %6d\n", new_value, delta);
+	//printf("position %8d, delta %6d\n", new_value, delta);
 
-	return new_value;
+	return delta;
 }

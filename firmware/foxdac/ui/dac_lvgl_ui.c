@@ -1,4 +1,5 @@
 #include "dac_lvgl_ui.h"
+#include "lv_port_indev.h"
 
 ///////////////////// VARIABLES ////////////////////
 lv_obj_t * MainUI;
@@ -41,8 +42,12 @@ void DAC_BuildPages(void)
     lv_obj_clear_state(VolumeImg, LV_STATE_DISABLED);
 
     VolumeSlider = lv_slider_create(MainUI);
-    lv_obj_set_size(VolumeSlider, 107, 4);
-    lv_obj_align(VolumeSlider, LV_ALIGN_CENTER, 9, 23);
+    lv_obj_set_size(VolumeSlider, 96, 4);
+    lv_obj_align(VolumeSlider, LV_ALIGN_CENTER, 10, 23);
+    lv_obj_set_style_border_width(VolumeSlider, 1, LV_STATE_FOCUSED);
+    lv_obj_set_style_outline_width(VolumeSlider, 0, LV_STATE_FOCUSED);
+    lv_obj_set_style_border_width(VolumeSlider, 1, LV_STATE_EDITED);
+    lv_obj_set_style_outline_width(VolumeSlider, 0, LV_STATE_EDITED);
     lv_slider_set_range(VolumeSlider, 0, 100);
     lv_slider_set_mode(VolumeSlider, LV_BAR_MODE_NORMAL);
     lv_slider_set_value(VolumeSlider, 25, LV_ANIM_OFF);
@@ -107,22 +112,28 @@ void DAC_BuildPages(void)
 
     // selection box
 
-
-    static lv_style_t style;
-    lv_style_init(&style);
+    static lv_style_t StyleSelected;
+    lv_style_init(&StyleSelected);
 
     /*Set a background color and a radius*/
-    lv_style_set_radius(&style, 5);
+    lv_style_set_radius(&StyleSelected, 5);
 
     /* Add outline*/
     lv_color_t white = { .full = 1 };
 
-    lv_style_set_outline_width(&style, 1);
-    lv_style_set_outline_color(&style, white);
-    lv_style_set_outline_pad(&style, 2);
+    lv_style_set_outline_width(&StyleSelected, 1);
+    lv_style_set_outline_color(&StyleSelected, white);
+    lv_style_set_outline_pad(&StyleSelected, 2);
 
     /*Create an object with the new style*/
-    lv_obj_add_style(UsbImg, &style, LV_PART_MAIN);
+    lv_obj_add_style(UsbImg, &StyleSelected, LV_PART_MAIN);
+
+    // assign encoder to volume slider
+    lv_group_t * EncGroup = lv_group_create();
+    lv_group_add_obj(EncGroup, VolumeSlider);
+    lv_group_focus_obj(VolumeSlider);
+    lv_indev_set_group(indev_encoder, EncGroup);
+    lv_group_set_editing(EncGroup, true);
 
     // init
 

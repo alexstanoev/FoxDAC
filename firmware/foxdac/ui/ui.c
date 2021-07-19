@@ -15,12 +15,14 @@
 
 #include "lvgl/lvgl.h"
 #include "lv_port_disp.h"
+#include "lv_port_indev.h"
 
 #include "dac_lvgl_ui.h"
 
 static void lv_init_ui(void) {
 	lv_init();
     lv_port_disp_init();
+    lv_port_indev_init();
     //lv_theme_set_current(lv_theme_get_mono());
 }
 

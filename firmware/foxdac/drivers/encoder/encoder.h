@@ -9,6 +9,6 @@
 #define FOXDAC_DRIVERS_ENCODER_ENCODER_H_
 
 void encoder_init(void);
-int32_t encoder_get_count(void);
+int32_t encoder_get_delta(void);
 
 #endif /* FOXDAC_DRIVERS_ENCODER_ENCODER_H_ */

@@ -64,4 +64,6 @@ else()
 file(GLOB_RECURSE SOURCES src/*.c)
 add_library(lvgl STATIC ${SOURCES})
 
+target_link_libraries(lvgl pico_time pico_stdlib)
+
 endif()
