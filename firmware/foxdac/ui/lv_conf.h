@@ -32,7 +32,7 @@
 #define LV_COLOR_SCREEN_TRANSP    0
 
 /*Images pixels with this color will not be drawn if they are  chroma keyed)*/
-#define LV_COLOR_CHROMA_KEY    lv_color_hex(0x00ff00)         /*pure green*/
+#define LV_COLOR_CHROMA_KEY    lv_color_hex(0x000000)         /*pure green*/
 
 /*=========================
    MEMORY SETTINGS
@@ -54,7 +54,7 @@
 #endif     /*LV_MEM_CUSTOM*/
 
 /*Use the standard `memcpy` and `memset` instead of LVGL's own functions. (Might or might not be faster).*/
-#define LV_MEMCPY_MEMSET_STD    0
+#define LV_MEMCPY_MEMSET_STD    1
 
 /*====================
    HAL SETTINGS
@@ -147,7 +147,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
  *LV_LOG_LEVEL_ERROR       Only critical issue, when the system may fail
  *LV_LOG_LEVEL_USER        Only logs added by the user
  *LV_LOG_LEVEL_NONE        Do not log anything*/
-#  define LV_LOG_LEVEL    LV_LOG_LEVEL_WARN
+#  define LV_LOG_LEVEL    LV_LOG_LEVEL_INFO
 
 /*1: Print the log with 'printf';
  *0: User need to register a callback with `lv_log_register_print_cb()`*/
@@ -263,9 +263,9 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 /*Montserrat fonts with ASCII range and some symbols using bpp = 4
  *https://fonts.google.com/specimen/Montserrat*/
 #define LV_FONT_MONTSERRAT_8     0
-#define LV_FONT_MONTSERRAT_10    1
-#define LV_FONT_MONTSERRAT_12    1
-#define LV_FONT_MONTSERRAT_14    1
+#define LV_FONT_MONTSERRAT_10    0
+#define LV_FONT_MONTSERRAT_12    0
+#define LV_FONT_MONTSERRAT_14    0
 #define LV_FONT_MONTSERRAT_16    0
 #define LV_FONT_MONTSERRAT_18    0
 #define LV_FONT_MONTSERRAT_20    0
@@ -291,7 +291,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 #define LV_FONT_SIMSUN_16_CJK            0  /*1000 most common CJK radicals*/
 
 /*Pixel perfect monospace fonts*/
-#define LV_FONT_UNSCII_8        0
+#define LV_FONT_UNSCII_8        1
 #define LV_FONT_UNSCII_16       0
 
 /*Optionally declare custom fonts here.
@@ -300,7 +300,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 #define LV_FONT_CUSTOM_DECLARE
 
 /*Always set a default font*/
-#define LV_FONT_DEFAULT &lv_font_montserrat_14
+#define LV_FONT_DEFAULT &lv_font_unscii_8
 
 /*Enable handling large font and/or fonts with a lot of characters.
  *The limit depends on the font size, font face and bpp.

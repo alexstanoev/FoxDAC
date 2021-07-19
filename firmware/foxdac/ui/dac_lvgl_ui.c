@@ -105,12 +105,30 @@ void DAC_BuildPages(void)
 
     lv_obj_clear_state(LogoImg, LV_STATE_DISABLED);
 
+    // selection box
+
+
+    static lv_style_t style;
+    lv_style_init(&style);
+
+    /*Set a background color and a radius*/
+    lv_style_set_radius(&style, 5);
+
+    /* Add outline*/
+    lv_color_t white = { .full = 1 };
+
+    lv_style_set_outline_width(&style, 1);
+    lv_style_set_outline_color(&style, white);
+    lv_style_set_outline_pad(&style, 2);
+
+    /*Create an object with the new style*/
+    lv_obj_add_style(UsbImg, &style, LV_PART_MAIN);
 
     // init
 
     lv_scr_load_anim(Logo, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
 
-    lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_MOVE_TOP, 100, 1000, false);
+    lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_MOVE_TOP, 300, 3000, false);
 
 }
 

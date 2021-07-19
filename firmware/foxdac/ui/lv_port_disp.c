@@ -137,7 +137,7 @@ void lv_port_disp_init(void)
     /*Finally register the driver*/
     lv_disp_drv_register(&disp_drv);
 
-    lv_theme_t * th = lv_theme_mono_init(lv_disp_get_default(), true, &lv_font_montserrat_10);
+    lv_theme_t * th = lv_theme_mono_init(lv_disp_get_default(), true, &lv_font_unscii_8);
     lv_disp_set_theme(lv_disp_get_default(), th);
 }
 
