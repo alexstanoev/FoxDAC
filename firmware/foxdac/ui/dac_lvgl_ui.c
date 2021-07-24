@@ -135,7 +135,7 @@ void DAC_BuildPages(void)
     lv_style_set_outline_pad(&StyleSelected, 2);
 
     /*Create an object with the new style*/
-    lv_obj_add_style(UsbImg, &StyleSelected, LV_PART_MAIN);
+    lv_obj_add_style(OpticalImg2, &StyleSelected, LV_PART_MAIN);
 
     // assign encoder to volume slider
     lv_group_t * EncGroup = lv_group_create();

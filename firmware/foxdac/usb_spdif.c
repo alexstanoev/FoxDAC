@@ -272,9 +272,12 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
     uint16_t vol_mul = audio_state.vol_mul;
     int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
     int16_t *in = (int16_t *) usb_buffer->data;
-    for (int i = 0; i < audio_buffer->sample_count * 2; i++) {
-        out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
-    }
+
+    //for (int i = 0; i < audio_buffer->sample_count * 2; i++) {
+    //    out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
+    //}
+
+    spectrum_consume_samples(in, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
     // keep on truckin'

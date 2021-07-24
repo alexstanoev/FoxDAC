@@ -6,7 +6,14 @@
 
 #include "../drivers/ssd1306/ssd1306.h"
 
+#define BAD_APPLE 0
+
+#if BAD_APPLE
 #include "badapple_rle.h"
+#else
+const uint8_t badapple[3] = { 0 };
+const uint8_t badapple_len = 0;
+#endif
 
 static uint32_t fr_byte_idx = 2;
 static uint32_t cur_frame = 0;
@@ -78,6 +85,6 @@ static void badapple_next_frame(lv_timer_t * timer) {
 }
 
 void badapple_init(void) {
-    timer = lv_timer_create(badapple_next_frame, 42, NULL); // 24fps = 41.6ms
+    timer = lv_timer_create(badapple_next_frame, 41, NULL); // 24fps = 41.6ms
     lv_timer_pause(timer);
 }

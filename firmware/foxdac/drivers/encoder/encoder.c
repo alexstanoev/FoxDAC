@@ -18,7 +18,7 @@
 
 #define DEFAULT_COUNTS_PER_REV     24
 #define DEFAULT_COUNT_MICROSTEPS   0
-#define DEFAULT_FREQ_DIVIDER       1
+#define DEFAULT_FREQ_DIVIDER       250
 
 #define STATE_A_MASK       0x80000000
 #define STATE_B_MASK       0x40000000
@@ -219,5 +219,5 @@ int32_t encoder_get_delta(void) {
     int32_t delta = count - last_captured_count;
     last_captured_count = count;
 
-    return delta;
+    return delta * -1;
 }
