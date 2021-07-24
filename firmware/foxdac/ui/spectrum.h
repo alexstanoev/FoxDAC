@@ -11,6 +11,7 @@
 #include "lvgl/lvgl.h"
 #include "stdint.h"
 
+void spectrum_core0_loop(void);
 void spectrum_consume_samples(int16_t* samples, uint32_t sample_count);
 void spectrum_init(void);
 void spectrum_start(void);

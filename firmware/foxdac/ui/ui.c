@@ -6,6 +6,7 @@
  */
 
 #include "pico/stdlib.h"
+#include "pico/time.h"
 #include "hardware/i2c.h"
 
 #include "../drivers/ssd1306/ssd1306.h"
@@ -27,6 +28,13 @@ static void lv_init_ui(void) {
     lv_port_indev_init();
 }
 
+static bool lvgl_timer_cb(repeating_timer_t *rt) {
+    lv_task_handler();
+    return true;
+}
+
+static repeating_timer_t lv_timer;
+
 void ui_init(void) {
     i2c_init(SSD1306_I2C_PORT, 400 * 1000);
     gpio_set_function(14, GPIO_FUNC_I2C); // GP14
@@ -36,13 +44,16 @@ void ui_init(void) {
 
     ssd1306_Init();
 
-    sleep_ms(50);
+    busy_wait_ms(50);
 
     lv_init_ui();
 
     encoder_init();
 
     //DAC_BuildPages();
+
+    //alarm_pool_t* pool = alarm_pool_create(1, 1);
+    //alarm_pool_add_repeating_timer_ms(pool, 5, lvgl_timer_cb, NULL, &lv_timer);
 
     spectrum_init();
 
@@ -53,9 +64,7 @@ void ui_init(void) {
     //badapple_start();
 }
 
-void ui_loop(void) {
-	//ssd1306_TestAll();
+void __attribute__((noinline)) __scratch_x("ui_loop") ui_loop(void) {
 	lv_task_handler();
-	//printf("enc: %d\n", encoder_get_count());
-	sleep_ms(3);
+	busy_wait_ms(5);
 }

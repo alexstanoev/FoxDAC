@@ -86,7 +86,7 @@ static void microstep_down(int32_t time) {
 		cumulative_time += time;
 }
 
-static void pio1_interrupt_callback() {
+static void __not_in_flash_func(pio1_interrupt_callback)() {
 	while(enc_pio->ints0 & (PIO_IRQ0_INTS_SM0_RXNEMPTY_BITS << enc_sm)) {
 		uint32_t received = pio_sm_get(enc_pio, enc_sm);
 
@@ -208,6 +208,7 @@ void encoder_init(void) {
 
 	irq_set_exclusive_handler(PIO1_IRQ_0, pio1_interrupt_callback);
 	irq_set_enabled(PIO1_IRQ_0, true);
+	irq_set_priority(PIO1_IRQ_0, PICO_DEFAULT_IRQ_PRIORITY + 2);
 
 	//Read the current state of the encoder pins and start the PIO program on the SM
 	stateA = gpio_get(pinA);

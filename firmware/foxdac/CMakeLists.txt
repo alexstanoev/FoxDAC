@@ -17,10 +17,11 @@ if (TARGET usb_device)
             # need large descriptor
             PICO_USBDEV_MAX_DESCRIPTOR_SIZE=256
 
-            PICO_USBDEV_ISOCHRONOUS_BUFFER_STRIDE_TYPE=1
+            PICO_USBDEV_ISOCHRONOUS_BUFFER_STRIDE_TYPE=2
             PICO_USBDEV_ENABLE_DEBUG_TRACE
 
             PICO_AUDIO_SPDIF_PIN=9
+            PICO_AUDIO_SPDIF_DMA_IRQ=1
     )
 
     target_link_libraries(foxdac dac_ui ssd1306_driver pico_stdlib usb_device pico_audio_spdif pico_multicore hardware_i2c)

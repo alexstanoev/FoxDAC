@@ -12,6 +12,7 @@
 #include "pico/audio_spdif.h"
 #include "pico/multicore.h"
 #include "hardware/sync.h"
+#include "hardware/irq.h"
 #include "lufa/AudioClassCommon.h"
 
 #include "ui/ui.h"
@@ -43,6 +44,8 @@ static char *descriptor_strings[] =
 #define AUDIO_SAMPLE_FREQ(frq) (uint8_t)(frq), (uint8_t)((frq >> 8)), (uint8_t)((frq >> 16))
 
 #define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 999) / 1000) * 4)
+//#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(96)
+
 #define FEATURE_MUTE_CONTROL 1u
 #define FEATURE_VOLUME_CONTROL 2u
 
@@ -63,7 +66,7 @@ struct audio_device_config {
         USB_Audio_StdDescriptor_Interface_AS_t streaming;
         struct __packed {
             USB_Audio_StdDescriptor_Format_t core;
-            USB_Audio_SampleFreq_t freqs[2];
+            USB_Audio_SampleFreq_t freqs[3];
         } format;
     } as_audio;
     struct __packed {
@@ -182,7 +185,8 @@ static const struct audio_device_config audio_device_config = {
                         },
                         .freqs = {
                                 AUDIO_SAMPLE_FREQ(44100),
-                                AUDIO_SAMPLE_FREQ(48000)
+                                AUDIO_SAMPLE_FREQ(48000),
+                                AUDIO_SAMPLE_FREQ(96000)
                         },
                 },
         },
@@ -192,7 +196,7 @@ static const struct audio_device_config audio_device_config = {
                         .bDescriptorType  = DTYPE_Endpoint,
                         .bEndpointAddress = AUDIO_OUT_ENDPOINT,
                         .bmAttributes     = 5,
-                        .wMaxPacketSize   = AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX),
+                        .wMaxPacketSize   = 192, //AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX),
                         .bInterval        = 1,
                         .bRefresh         = 0,
                         .bSyncAddr        = AUDIO_IN_ENDPOINT,
@@ -258,7 +262,7 @@ static struct {
 
 static struct audio_buffer_pool *producer_pool;
 
-static void _as_audio_packet(struct usb_endpoint *ep) {
+static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     assert(ep->current_transfer);
     struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
     DEBUG_PINS_SET(audio_timing, 1);
@@ -273,11 +277,11 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
     int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
     int16_t *in = (int16_t *) usb_buffer->data;
 
-    //for (int i = 0; i < audio_buffer->sample_count * 2; i++) {
-    //    out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
-    //}
+    for (int i = 0; i < audio_buffer->sample_count * 2; i++) {
+        out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
+    }
 
-    spectrum_consume_samples(in, audio_buffer->sample_count);
+    spectrum_consume_samples(out, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
     // keep on truckin'
@@ -285,7 +289,7 @@ static void _as_audio_packet(struct usb_endpoint *ep) {
     usb_packet_done(ep);
 }
 
-static void _as_sync_packet(struct usb_endpoint *ep) {
+static void __not_in_flash_func(_as_sync_packet)(struct usb_endpoint *ep) {
     assert(ep->current_transfer);
     DEBUG_PINS_SET(audio_timing, 2);
     DEBUG_PINS_CLR(audio_timing, 2);
@@ -421,6 +425,7 @@ static void _audio_reconfigure() {
     switch (audio_state.freq) {
         case 44100:
         case 48000:
+        case 96000:
             break;
         default:
             audio_state.freq = 44100;
@@ -589,34 +594,84 @@ void usb_sound_card_init() {
     usb_device_start();
 }
 
-static void core1_worker() {
+// initialize for 48k we allow changing later
+struct audio_format audio_format_48k = {
+        .format = AUDIO_BUFFER_FORMAT_PCM_S16,
+        .sample_freq = 48000,
+        .channel_count = 2,
+};
+
+struct audio_spdif_config config = {
+        .pin = PICO_AUDIO_SPDIF_PIN,
+        .dma_channel = 0,
+        .pio_sm = 0,
+};
+
+struct audio_buffer_format producer_format = {
+        .format = &audio_format_48k,
+        .sample_stride = 4
+};
+
+void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
+    busy_wait_ms(50);
+
     uint32_t primask = save_and_disable_interrupts();
     // the OLED gets upset if it gets interrupted during init
     ui_init();
     restore_interrupts(primask);
 
-    // start up PIO SPDIF
     audio_spdif_set_enabled(true);
+    irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 
     while(1) {
         //puts("looping");
-        tight_loop_contents();
+        //tight_loop_contents();
 
         //ui_init();
+
         ui_loop();
+
+        sleep_ms(10);
+
+        //__wfi();
     }
+}
+
+void core0_worker() {
+
+    producer_pool = audio_new_producer_pool(&producer_format, 6, 192); // todo correct size
+
+    bool __unused ok;
+    const struct audio_format *output_format;
+    output_format = audio_spdif_setup(&audio_format_48k, &config);
+    if (!output_format) {
+        panic("PicoAudio: Unable to open audio device.\n");
+    }
+
+    ok = audio_spdif_connect_extra(producer_pool, false, 6, NULL);
+    assert(ok);
+
+    usb_sound_card_init();
+
+    irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
 }
 
 int main(void) {
     //set_sys_clock_48mhz();
     //set_sys_clock_khz(96000, true);
 
+    if (!set_sys_clock_khz(250000, false))
+      printf("system clock 250MHz failed\n");
+    else
+      printf("system clock now 250MHz\n");
+
+
     stdout_uart_init();
 
     //gpio_debug_pins_init();
     puts("USB SOUND CARD");
 
-#ifndef NDEBUG
+#ifdef NDEBUG
     for(uint i=0;i<count_of(audio_device_config.as_audio.format.freqs);i++) {
         uint freq = audio_device_config.as_audio.format.freqs[i].Byte1 |
                 (audio_device_config.as_audio.format.freqs[i].Byte2 << 8u) |
@@ -624,40 +679,21 @@ int main(void) {
         assert(freq <= AUDIO_FREQ_MAX);
     }
 #endif
-    // initialize for 48k we allow changing later
-    struct audio_format audio_format_48k = {
-            .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-            .sample_freq = 48000,
-            .channel_count = 2,
-    };
 
-    struct audio_buffer_format producer_format = {
-            .format = &audio_format_48k,
-            .sample_stride = 4
-    };
+    //usb_sound_card_init();
 
-    producer_pool = audio_new_producer_pool(&producer_format, 8, 48); // todo correct size
-    bool __unused ok;
-    struct audio_spdif_config config = {
-            .pin = PICO_AUDIO_SPDIF_PIN,
-            .dma_channel = 0,
-            .pio_sm = 0,
-    };
-
-    const struct audio_format *output_format;
-    output_format = audio_spdif_setup(&audio_format_48k, &config);
-    if (!output_format) {
-        panic("PicoAudio: Unable to open audio device.\n");
-    }
-
-    ok = audio_spdif_connect_extra(producer_pool, false, 3, NULL);
-    assert(ok);
-    usb_sound_card_init();
+    core0_worker();
 
     multicore_launch_core1(core1_worker);
     printf("HAHA %04x %04x %04x %04x\n", MIN_VOLUME, DEFAULT_VOLUME, MAX_VOLUME, VOLUME_RESOLUTION);
     // MSD is irq driven
     //while (1) __wfi();
 
-    while (1) __wfi();
+    //audio_spdif_set_enabled(true);
+
+    while (1) {
+        spectrum_core0_loop();
+        //busy_wait_ms(10);
+        __wfi();
+    }
 }
