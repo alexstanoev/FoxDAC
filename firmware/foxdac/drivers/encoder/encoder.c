@@ -40,8 +40,8 @@ enum Direction {
 	COUNTERCLOCK  = -1,
 };
 
-const int pinA = 12;
-const int pinB = 13;
+const int pinA = 19;
+const int pinB = 20;
 
 const float counts_per_revolution   = DEFAULT_COUNTS_PER_REV;
 const bool count_microsteps         = DEFAULT_COUNT_MICROSTEPS;

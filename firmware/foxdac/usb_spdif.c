@@ -17,6 +17,8 @@
 
 #include "ui/ui.h"
 
+#include "drivers/wm8805/wm8805.h"
+
 // todo forget why this is using core 1 for sound: presumably not necessary
 // todo noop when muted
 
@@ -631,7 +633,7 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
 
         ui_loop();
 
-        sleep_ms(10);
+        sleep_ms(5);
 
         //__wfi();
     }
@@ -654,6 +656,9 @@ void core0_worker() {
     usb_sound_card_init();
 
     irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
+
+
+    wm8805_init();
 }
 
 int main(void) {

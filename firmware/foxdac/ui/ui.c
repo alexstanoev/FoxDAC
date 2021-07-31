@@ -50,14 +50,14 @@ void ui_init(void) {
 
     encoder_init();
 
-    //DAC_BuildPages();
+    DAC_BuildPages();
 
     //alarm_pool_t* pool = alarm_pool_create(1, 1);
     //alarm_pool_add_repeating_timer_ms(pool, 5, lvgl_timer_cb, NULL, &lv_timer);
 
-    spectrum_init();
+    //spectrum_init();
 
-    spectrum_start();
+    //spectrum_start();
 
     //badapple_init();
 
