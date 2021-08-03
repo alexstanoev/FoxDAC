@@ -1,6 +1,8 @@
 #include "dac_lvgl_ui.h"
 #include "lv_port_indev.h"
 
+#include "../drivers/tpa6130/tpa6130.h"
+
 ///////////////////// VARIABLES ////////////////////
 lv_obj_t * MainUI;
 lv_obj_t * VolumeImg;
@@ -16,6 +18,11 @@ lv_obj_t * LogoImg;
 
 static uint8_t ui_inited = 0;
 
+static lv_style_t StyleSelected;
+
+#define INPUT_LEN 4
+static lv_obj_t** input_list[INPUT_LEN] = { &UsbImg, &OpticalImg1, &OpticalImg2, &OpticalImg3 };
+
 ///////////////////// IMAGES ////////////////////
 LV_IMG_DECLARE(img_speaker_png);   // assets/speaker.png
 LV_IMG_DECLARE(img_usb_png);   // assets/usb.png
@@ -27,15 +34,17 @@ LV_IMG_DECLARE(img_fox_logo_png);   // assets/fox_logo.png
 ///////////////////// ANIMATIONS ////////////////////
 
 ///////////////////// FUNCTIONS2 ////////////////////
-static void VolumeSlider_eventhandler(lv_obj_t * obj, lv_event_t event)
+static void VolumeSlider_eventhandler(lv_event_t * event)
 {
+    int32_t value = lv_slider_get_value(VolumeSlider);
+    tpa6130_set_volume(value);
 }
 
 void UI_SetVolume(int32_t vol)
 {
     if(!ui_inited) return;
     printf("v: %d\n", vol);
-    lv_slider_set_value(VolumeSlider, vol, LV_ANIM_ON);
+    //lv_slider_set_value(VolumeSlider, vol, LV_ANIM_ON);
 }
 
 ///////////////////// SCREENS ////////////////////
@@ -57,11 +66,11 @@ void DAC_BuildPages(void)
     lv_obj_set_style_outline_width(VolumeSlider, 0, LV_STATE_FOCUSED);
     lv_obj_set_style_border_width(VolumeSlider, 1, LV_STATE_EDITED);
     lv_obj_set_style_outline_width(VolumeSlider, 0, LV_STATE_EDITED);
-    lv_slider_set_range(VolumeSlider, 0, 91);
+    lv_slider_set_range(VolumeSlider, 0, 63);
     lv_slider_set_mode(VolumeSlider, LV_BAR_MODE_NORMAL);
-    lv_slider_set_value(VolumeSlider, 25, LV_ANIM_OFF);
+    lv_slider_set_value(VolumeSlider, 10, LV_ANIM_OFF);
     lv_slider_set_left_value(VolumeSlider, 0, LV_ANIM_OFF);
-    //lv_obj_set_event_cb(VolumeSlider, VolumeSlider_eventhandler);
+    lv_obj_add_event_cb(VolumeSlider, VolumeSlider_eventhandler, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_clear_state(VolumeSlider, LV_STATE_DISABLED);
 
     SamplFreqLbl = lv_label_create(MainUI);
@@ -121,7 +130,6 @@ void DAC_BuildPages(void)
 
     // selection box
 
-    static lv_style_t StyleSelected;
     lv_style_init(&StyleSelected);
 
     /*Set a background color and a radius*/
@@ -159,4 +167,17 @@ void DAC_BuildPages(void)
 
     ui_inited = 1;
 }
+
+void ui_select_input(uint8_t input) {
+    if(input >= INPUT_LEN) {
+        return;
+    }
+
+    for(uint8_t i = 0; i < INPUT_LEN; i++) {
+        lv_obj_remove_style(*input_list[i], &StyleSelected, LV_PART_MAIN);
+    }
+
+    lv_obj_add_style(*input_list[input], &StyleSelected, LV_PART_MAIN);
+}
+
 

@@ -8,7 +8,7 @@
 #ifndef FOXDAC_UI_H_
 #define FOXDAC_UI_H_
 
-
+void oled_init(void);
 void ui_init(void);
 void ui_loop(void);
 

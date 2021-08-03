@@ -617,10 +617,12 @@ struct audio_buffer_format producer_format = {
 void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
     busy_wait_ms(50);
 
-    uint32_t primask = save_and_disable_interrupts();
+    oled_init();
+
+    //uint32_t primask = save_and_disable_interrupts();
     // the OLED gets upset if it gets interrupted during init
     ui_init();
-    restore_interrupts(primask);
+    //restore_interrupts(primask);
 
     audio_spdif_set_enabled(true);
     irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
@@ -631,15 +633,23 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
 
         //ui_init();
 
+        wm8805_poll_intstat();
+
         ui_loop();
 
-        sleep_ms(5);
+        sleep_ms(3);
 
         //__wfi();
     }
 }
 
 void core0_worker() {
+
+    gpio_init(23);
+    gpio_set_dir(23, GPIO_OUT);
+    gpio_put(23, 1);
+
+    //oled_init();
 
     producer_pool = audio_new_producer_pool(&producer_format, 6, 192); // todo correct size
 
@@ -657,8 +667,8 @@ void core0_worker() {
 
     irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
 
-
     wm8805_init();
+    tpa6130_init();
 }
 
 int main(void) {

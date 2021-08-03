@@ -6,7 +6,7 @@
 
 #include "../drivers/ssd1306/ssd1306.h"
 
-#define BAD_APPLE 0
+#define BAD_APPLE 1
 
 #if BAD_APPLE
 #include "badapple_rle.h"

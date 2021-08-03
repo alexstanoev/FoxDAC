@@ -30,6 +30,8 @@ LV_IMG_DECLARE(img_fox_logo_png);   // assets/fox_logo.png
 void UI_SetVolume(int32_t vol);
 void DAC_BuildPages(void);
 
+void ui_select_input(uint8_t input);
+
 #ifdef __cplusplus
 } /*extern "C"*/
 #endif

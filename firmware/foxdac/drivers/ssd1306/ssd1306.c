@@ -7,6 +7,38 @@
 #include "pico/time.h"
 #include "hardware/i2c.h"
 
+
+#define I2C_RECOVER_NUM_CLOCKS      10U     /* # clock cycles for recovery  */
+#define I2C_RECOVER_CLOCK_FREQ      50000U  /* clock frequency for recovery */
+
+#define I2C_RECOVER_CLOCK_DELAY_US  (1000000U / (2U * I2C_RECOVER_CLOCK_FREQ))
+
+static void i2cLockupRecover(void) {
+    gpio_init(15);
+    gpio_set_dir(15, GPIO_OUT);
+
+    for (uint8_t i = 0; i < I2C_RECOVER_NUM_CLOCKS; i++) {
+        sleep_us(I2C_RECOVER_CLOCK_DELAY_US);
+        gpio_put(15, 0);
+        sleep_us(I2C_RECOVER_CLOCK_DELAY_US);
+        gpio_put(15, 1);
+    }
+}
+
+void oled_init(void) {
+    i2cLockupRecover();
+
+    i2c_init(SSD1306_I2C_PORT, 400 * 1000);
+    gpio_set_function(14, GPIO_FUNC_I2C); // GP14
+    gpio_set_function(15, GPIO_FUNC_I2C); // GP15
+    gpio_pull_up(14);
+    gpio_pull_up(15);
+
+    ssd1306_Init();
+
+    busy_wait_ms(50);
+}
+
 void ssd1306_Reset(void) {
     /* for I2C - do nothing */
 }
@@ -49,6 +81,8 @@ SSD1306_Error_t ssd1306_FillBuffer(uint8_t* buf, uint32_t len) {
 void ssd1306_Init(void) {
     // Reset OLED
     ssd1306_Reset();
+
+    ssd1306_WriteCommand(0xE4);
 
     // Wait for the screen to boot
     busy_wait_ms(100);
