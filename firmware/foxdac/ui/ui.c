@@ -111,6 +111,7 @@ static void buttons_read(void) {
 
             cur_input = (cur_input + 1) % INPUT_COUNT;
             ui_select_input(cur_input);
+
             wm8805_set_input(input_to_wm[cur_input]);
 
             //printf("press\n");

@@ -26,6 +26,8 @@ static void i2cLockupRecover(void) {
 }
 
 void oled_init(void) {
+    i2c_deinit(SSD1306_I2C_PORT);
+
     i2cLockupRecover();
 
     i2c_init(SSD1306_I2C_PORT, 400 * 1000);
@@ -82,7 +84,7 @@ void ssd1306_Init(void) {
     // Reset OLED
     ssd1306_Reset();
 
-    ssd1306_WriteCommand(0xE4);
+    //ssd1306_WriteCommand(0xE4);
 
     // Wait for the screen to boot
     busy_wait_ms(100);

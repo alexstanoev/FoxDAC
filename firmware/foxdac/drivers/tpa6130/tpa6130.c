@@ -13,40 +13,11 @@
 #define TPA_I2C_SCL 13
 #define TPA_I2C_ADDR 0x60
 
-/* Set TPA6130_MODE to one of the following selections
- * TPA6130_MODE_STEREO, left and right channels are connected to DAC
- * TPA6130_MODE_DUAL_MONO, left channel is connected but this signal is
- * used to feed both amplifiers for right and left channel output
- * TPA6130_MONO_L, only left channel is used with the DAC
- * TPA6130_MONO_R, only right channel is used with the DAC
- */
-#define TPA6130_MODE_STEREO 0
-#define TPA6130_MODE_MONO 1
-/*
-#define TPA6130_MODE_MONO_L 2
-#define TPA6130_MODE_MONO_R 3
- */
-
-
-/* TWI slave address of the amplifier
- * This device has a fixed slave address.
- * -> No hardware option to change it
- */
 #define TPA6130_TWI_ADDRESS 0x60
-
-
-/*! \name Volume Control
- */
-//! @{
 
 #define TPA6130_VOL_MIN       ((int8_t)(  0)) // -59dB
 #define TPA6130_VOL_MAX       ((int8_t)( 63)) // : +4dB
 
-//! @}
-
-/* Register map
- * Use these definitions with the register write/read functions
- */
 #define TPA6130_CONTROL              0x1
 #define TPA6130_VOLUME_AND_MUTE      0x2
 #define TPA6130_OUTPUT_IMPEDANCE     0x3
@@ -80,6 +51,20 @@
  * 0x3F = 63 = 4dB, minimum is 0x0 = -59dB.
  */
 #define TPA6130_MAX_VOLUME  0x3F
+
+#define TPA6130_VOL_CNT 64
+static const char* tpa_vol_to_str[TPA6130_VOL_CNT] = {
+        "MUTE", "–53.5", "–50.0", "–47.5", "–45.5", "–43.9",
+        "–41.4", "–39.5", "–36.5", "–35.3", "–33.3", "–31.7", "–30.4", "–28.6", "–27.1",
+        "–26.3", "–24.7", "–23.7",
+        "–22.5", "–21.7", "–20.5", "–19.6", "–18.8", "–17.8", "–17.0", "–16.2", "–15.2",
+        "–14.5", "–13.7", "–13.0",
+        "–12.3", "–11.6", "–10.9", "–10.3", "–9.7", "–9.0", "–8.5", "–7.8", "–7.2",
+        "–6.7", "–6.1", "–5.6", "–5.1",
+        "–4.5", "–4.1", "–3.5", "–3.1", "–2.6", "–2.1", "–1.7", "–1.2", "–0.8", "–0.3",
+        "0.1", "0.5", "0.9", "1.4",
+        "1.7", "2.1", "2.5", "2.9", "3.3", "3.6", "4.0"
+};
 
 void tpa6130_init_i2c(void) {
     i2c_init(TPA_I2C_PORT, 100 * 1000);
@@ -129,12 +114,9 @@ void tpa6130_set_volume(int8_t volume)
 {
     int8_t new_volume = volume;
 
-    if(volume > TPA6130_VOL_MAX)
-    {
+    if(volume > TPA6130_VOL_MAX) {
         new_volume = TPA6130_VOL_MAX;
-    }
-    else if(volume <= TPA6130_VOL_MIN )
-    {
+    } else if(volume <= TPA6130_VOL_MIN) {
         // MUTE Left and Right;
         new_volume = MUTE_L|MUTE_R;
     }
@@ -149,52 +131,6 @@ void tpa6130_set_volume(int8_t volume)
 int8_t tpa6130_get_volume(void)
 {
     return read_reg(TPA6130_VOLUME_AND_MUTE);
-}
-
-
-/*! \brief Returns the current volume of the DAC.
- *         The volume is in the range 0 - 255
- */
-uint8_t tpa6130_dac_get_volume(void)
-{
-    // return volume is num display step for LCD
-    //  volume scale is between 10 and 245
-    // 0 is -100db
-    // 245 is max volume
-    uint16_t raw_volume;
-    raw_volume = (tpa6130_get_volume() & (~(MUTE_L | MUTE_R)));
-    return (uint8_t) ((raw_volume * 255) / TPA6130_VOL_MAX);
-}
-
-/*! \brief Set the volume of the DAC.
- */
-void tpa6130_dac_set_volume(uint8_t volume)
-{
-    tpa6130_set_volume(volume);
-}
-
-/*! \brief Increases the output volume of the amplifier by one step.
- * Stops at the maximum volume and thus does not wrap to the
- * lowest volume.
- */
-void tpa6130_dac_increase_volume(void)
-{
-    int8_t volume = tpa6130_get_volume()& (~(MUTE_L | MUTE_R));
-    if( volume < TPA6130_VOL_MIN )
-        volume = TPA6130_VOL_MIN;
-    tpa6130_set_volume(volume+1);
-}
-
-/*! \brief Decreases the output volume of the amplifier by one step.
- *
- * Stops at the lowest possible volume.
- */
-void tpa6130_dac_decrease_volume(void)
-{
-    int8_t volume = tpa6130_get_volume()& (~(MUTE_L | MUTE_R));
-    if( volume > TPA6130_VOL_MIN )
-        --volume;
-    tpa6130_set_volume( volume );
 }
 
 
@@ -218,4 +154,12 @@ void tpa6130_init(void) {
     tpa6130_set_volume(10);
 
     printf("TPA VOL: %d\n", tpa6130_get_volume());
+}
+
+const char* tpa6130_get_volume_str(uint8_t volume) {
+    if(volume >= TPA6130_VOL_CNT) {
+        return "N/A";
+    }
+
+    return tpa_vol_to_str[volume];
 }

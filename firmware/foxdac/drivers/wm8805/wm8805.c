@@ -225,6 +225,8 @@ void wm8805_poll_intstat(void) {
 
                 puts("S/PDIF PLL unlocked");
 
+                ui_set_sr_text("PLL ERROR");
+
                 // switch PLL coeffs around to try to find stable setting
 
                 if (pll_mode) {
@@ -326,6 +328,8 @@ void wm8805_poll_intstat(void) {
             sr_str = new_sr_str;
 
             printf("Detected SR: %s\n", sr_str);
+
+            ui_set_sr_text(sr_str);
         }
 
 

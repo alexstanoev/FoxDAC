@@ -31,6 +31,9 @@ void UI_SetVolume(int32_t vol);
 void DAC_BuildPages(void);
 
 void ui_select_input(uint8_t input);
+void ui_set_sr_text(const char* text);
+void ui_set_vol_text(const char* text);
+
 
 #ifdef __cplusplus
 } /*extern "C"*/

@@ -198,7 +198,7 @@ static const struct audio_device_config audio_device_config = {
                         .bDescriptorType  = DTYPE_Endpoint,
                         .bEndpointAddress = AUDIO_OUT_ENDPOINT,
                         .bmAttributes     = 5,
-                        .wMaxPacketSize   = 192, //AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX),
+                        .wMaxPacketSize   = AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX),
                         .bInterval        = 1,
                         .bRefresh         = 0,
                         .bSyncAddr        = AUDIO_IN_ENDPOINT,
@@ -619,6 +619,10 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
 
     oled_init();
 
+    busy_wait_ms(50);
+
+    oled_init();
+
     //uint32_t primask = save_and_disable_interrupts();
     // the OLED gets upset if it gets interrupted during init
     ui_init();
@@ -651,7 +655,7 @@ void core0_worker() {
 
     //oled_init();
 
-    producer_pool = audio_new_producer_pool(&producer_format, 6, 192); // todo correct size
+    producer_pool = audio_new_producer_pool(&producer_format, 8, 48); // todo correct size
 
     bool __unused ok;
     const struct audio_format *output_format;
@@ -660,7 +664,7 @@ void core0_worker() {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    ok = audio_spdif_connect_extra(producer_pool, false, 6, NULL);
+    ok = audio_spdif_connect_extra(producer_pool, false, 8, NULL);
     assert(ok);
 
     usb_sound_card_init();
@@ -675,10 +679,12 @@ int main(void) {
     //set_sys_clock_48mhz();
     //set_sys_clock_khz(96000, true);
 
-    if (!set_sys_clock_khz(250000, false))
-      printf("system clock 250MHz failed\n");
-    else
-      printf("system clock now 250MHz\n");
+    set_sys_clock_khz(250000, true);
+
+    //if (!set_sys_clock_khz(250000, false))
+    //  printf("system clock 250MHz failed\n");
+    //else
+    //  printf("system clock now 250MHz\n");
 
 
     stdout_uart_init();

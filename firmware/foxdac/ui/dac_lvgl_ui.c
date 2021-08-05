@@ -38,6 +38,8 @@ static void VolumeSlider_eventhandler(lv_event_t * event)
 {
     int32_t value = lv_slider_get_value(VolumeSlider);
     tpa6130_set_volume(value);
+
+    ui_set_vol_text(tpa6130_get_volume_str(value));
 }
 
 void UI_SetVolume(int32_t vol)
@@ -180,4 +182,10 @@ void ui_select_input(uint8_t input) {
     lv_obj_add_style(*input_list[input], &StyleSelected, LV_PART_MAIN);
 }
 
+void ui_set_sr_text(const char* text) {
+    lv_label_set_text(SamplFreqLbl, text);
+}
 
+void ui_set_vol_text(const char* text) {
+    lv_label_set_text(VolumeLbl, text);
+}

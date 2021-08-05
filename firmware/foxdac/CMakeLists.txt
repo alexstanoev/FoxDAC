@@ -15,7 +15,7 @@ if (TARGET usb_device)
             # need large descriptor
             PICO_USBDEV_MAX_DESCRIPTOR_SIZE=256
 
-            PICO_USBDEV_ISOCHRONOUS_BUFFER_STRIDE_TYPE=2
+            PICO_USBDEV_ISOCHRONOUS_BUFFER_STRIDE_TYPE=1
             PICO_USBDEV_ENABLE_DEBUG_TRACE
 
             PICO_AUDIO_SPDIF_PIN=9
