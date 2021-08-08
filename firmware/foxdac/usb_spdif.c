@@ -632,9 +632,9 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
 
 
     //printf("enabling spdif:\n");
-    audio_spdif_set_enabled(true);
-    spdif_enabled = 1;
-    irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
+    //audio_spdif_set_enabled(true);
+    //spdif_enabled = 1;
+    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 
     while(1) {
         //puts("looping");
@@ -729,7 +729,7 @@ int main(void) {
 
     //audio_spdif_set_enabled(true);
 
-    while(!spdif_enabled);
+    //while(!spdif_enabled);
 
     //board_init();
     //tusb_init();
@@ -737,9 +737,9 @@ int main(void) {
     while (1) {
         //spectrum_core0_loop();
 
-        //tud_task();
+        tud_task();
 
-        loop_sine();
+        //loop_sine();
 
         //busy_wait_ms(10);
         //__wfi();

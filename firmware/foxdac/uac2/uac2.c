@@ -111,34 +111,14 @@ struct audio_buffer_format producer_format = {
 void led_blinking_task(void);
 void audio_task(void);
 
-
-
-#define SINE_WAVE_TABLE_LEN 2048
-#define SAMPLES_PER_BUFFER 256
-
-static int16_t sine_wave_table[SINE_WAVE_TABLE_LEN];
-uint32_t step = 0x600000;
-uint32_t pos = 0;
-uint32_t pos_max = 0x10000 * SINE_WAVE_TABLE_LEN;
-uint vol = 128;
-
-
-
 /*------------- MAIN -------------*/
 int main_usb(void)
 {
+  board_init();
 
-    for (int i = 0; i < SINE_WAVE_TABLE_LEN; i++) {
-        sine_wave_table[i] = 32767 * cosf(i * 2 * (float) (M_PI / SINE_WAVE_TABLE_LEN));
-    }
+  tusb_init();
 
-
-
-  //board_init();
-
-  //tusb_init();
-
-  producer_pool = audio_new_producer_pool(&producer_format, 16, SAMPLES_PER_BUFFER);
+  producer_pool = audio_new_producer_pool(&producer_format, 16, 192);
 
   const struct audio_format *output_format;
   output_format = audio_spdif_setup(&audio_format_48k, &config);
@@ -150,54 +130,18 @@ int main_usb(void)
   assert(ok);
 
   // CORE 1?
-  //audio_spdif_set_enabled(true);
+  audio_spdif_set_enabled(true);
 
   TU_LOG1("Headset running\r\n");
 
-  //while (1)
-  //{
-  //  tud_task(); // TinyUSB device task
-    //audio_task();
-    //led_blinking_task();
-  //}
+//  while (1)
+//  {
+//    tud_task(); // TinyUSB device task
+//    audio_task();
+//    led_blinking_task();
+//  }
 
   return 0;
-}
-
-void loop_sine() {
-    //int n_bytes_received = 192;
-
-
-
-    struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
-
-    gpio_put(22, 1);
-
-    //int rxd_size = tud_audio_read(audio_buffer->buffer->bytes, n_bytes_received);
-
-    //printf("%u %u\n", n_bytes_received, rxd_size);
-
-    //audio_buffer->sample_count = n_bytes_received / 4;
-    //assert(audio_buffer->sample_count);
-    //assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
-
-
-  int j = 0;
-    int16_t *samples = (int16_t *) audio_buffer->buffer->bytes;
-    for (uint i = 0; i < audio_buffer->max_sample_count; i++) {
-        samples[j++] = (vol * sine_wave_table[pos >> 16u]) >> 8u;
-        samples[j++] = (vol * sine_wave_table[pos >> 16u]) >> 8u;
-        pos += step;
-        if (pos >= pos_max) pos -= pos_max;
-    }
-
-    audio_buffer->sample_count = audio_buffer->max_sample_count;
-
-    //spectrum_consume_samples(out, audio_buffer->sample_count);
-
-    give_audio_buffer(producer_pool, audio_buffer);
-
-    gpio_put(22, 0);
 }
 
 //--------------------------------------------------------------------+
@@ -447,23 +391,12 @@ bool tud_audio_rx_done_pre_read_cb(uint8_t rhport, uint16_t n_bytes_received, ui
   assert(audio_buffer->sample_count);
   assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
 
-
-int j = 0;
-  int16_t *samples = (int16_t *) audio_buffer->buffer->bytes;
-  for (uint i = 0; i < audio_buffer->sample_count; i++) {
-      samples[j++] = (vol * sine_wave_table[pos >> 16u]) >> 8u;
-      samples[j++] = (vol * sine_wave_table[pos >> 16u]) >> 8u;
-      pos += step;
-      if (pos >= pos_max) pos -= pos_max;
-  }
-
   //spectrum_consume_samples(out, audio_buffer->sample_count);
 
   give_audio_buffer(producer_pool, audio_buffer);
 
   gpio_put(22, 0);
 
-  //spk_data_size = tud_audio_read(spk_buf, n_bytes_received);
   return true;
 }
 
