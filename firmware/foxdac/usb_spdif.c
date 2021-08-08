@@ -655,7 +655,7 @@ void core0_worker() {
 
     //oled_init();
 
-    producer_pool = audio_new_producer_pool(&producer_format, 8, 48); // todo correct size
+    producer_pool = audio_new_producer_pool(&producer_format, 16, 48); // todo correct size
 
     bool __unused ok;
     const struct audio_format *output_format;
@@ -664,7 +664,7 @@ void core0_worker() {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    ok = audio_spdif_connect_extra(producer_pool, false, 8, NULL);
+    ok = audio_spdif_connect_extra(producer_pool, false, 4, NULL);
     assert(ok);
 
     usb_sound_card_init();

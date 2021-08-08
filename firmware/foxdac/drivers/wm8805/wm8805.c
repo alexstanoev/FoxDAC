@@ -91,7 +91,7 @@ static void init_device(void) {
     write_reg(8, 0b00110000);
 
     // set masking for interrupts
-    write_reg(10, 126);  // 1+2+3+4+5+6 => 0111 1110. We only care about unlock and rec_freq
+    //write_reg(10, 126);  // 1+2+3+4+5+6 => 0111 1110. We only care about unlock and rec_freq
 
     // set the AIF TX
     // bit 7:6 - always 0
@@ -266,6 +266,8 @@ void wm8805_poll_intstat(void) {
 
     if (bitRead(INTSTAT, 2)) {                                         // INT_CSUD
         puts("INT_CSUD");
+
+        printf("CSU %x\n", read_reg(0x0D));
     }
 
     if (bitRead(INTSTAT, 3)) {                                         // INT_TRANS_ERR
