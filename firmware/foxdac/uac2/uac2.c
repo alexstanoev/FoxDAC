@@ -40,7 +40,7 @@
 //--------------------------------------------------------------------+
 
 #ifndef AUDIO_SAMPLE_RATE
-#define AUDIO_SAMPLE_RATE     48000
+#define AUDIO_SAMPLE_RATE     96000
 #endif
 
 /* Blink pattern
@@ -93,7 +93,7 @@ static struct audio_buffer_pool *producer_pool;
 // initialize for 48k we allow changing later
 struct audio_format audio_format_48k = {
         .format = AUDIO_BUFFER_FORMAT_PCM_S16,
-        .sample_freq = 48000,
+        .sample_freq = AUDIO_SAMPLE_RATE,
         .channel_count = 2,
 };
 
@@ -118,7 +118,7 @@ int main_usb(void)
 
   tusb_init();
 
-  producer_pool = audio_new_producer_pool(&producer_format, 16, 192);
+  producer_pool = audio_new_producer_pool(&producer_format, 32, 384);
 
   const struct audio_format *output_format;
   output_format = audio_spdif_setup(&audio_format_48k, &config);
@@ -126,7 +126,7 @@ int main_usb(void)
       panic("PicoAudio: Unable to open audio device.\n");
   }
 
-  bool ok = audio_spdif_connect_extra(producer_pool, false, 4, NULL);
+  bool ok = audio_spdif_connect_extra(producer_pool, false, 8, NULL);
   assert(ok);
 
   // CORE 1?

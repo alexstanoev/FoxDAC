@@ -694,7 +694,7 @@ int main(void) {
     //set_sys_clock_48mhz();
     //set_sys_clock_khz(96000, true);
 
-    //set_sys_clock_khz(250000, true);
+    set_sys_clock_khz(250000, true);
 
     //if (!set_sys_clock_khz(250000, false))
     //  printf("system clock 250MHz failed\n");
