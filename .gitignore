@@ -10,4 +10,5 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 firmware/build/*
+firmware/build_release/*
 firmware/eclipse_build/*

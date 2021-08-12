@@ -198,7 +198,7 @@ static const struct audio_device_config audio_device_config = {
                         .bDescriptorType  = DTYPE_Endpoint,
                         .bEndpointAddress = AUDIO_OUT_ENDPOINT,
                         .bmAttributes     = 5,
-                        .wMaxPacketSize   = AUDIO_MAX_PACKET_SIZE(AUDIO_FREQ_MAX),
+                        .wMaxPacketSize   = 384,
                         .bInterval        = 1,
                         .bRefresh         = 0,
                         .bSyncAddr        = AUDIO_IN_ENDPOINT,
@@ -655,7 +655,7 @@ void core0_worker() {
 
     //oled_init();
 
-    producer_pool = audio_new_producer_pool(&producer_format, 16, 48); // todo correct size
+    producer_pool = audio_new_producer_pool(&producer_format, 16, 96); // todo correct size
 
     bool __unused ok;
     const struct audio_format *output_format;

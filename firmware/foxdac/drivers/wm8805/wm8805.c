@@ -91,7 +91,7 @@ static void init_device(void) {
     write_reg(8, 0b00110000);
 
     // set masking for interrupts
-    //write_reg(10, 126);  // 1+2+3+4+5+6 => 0111 1110. We only care about unlock and rec_freq
+    write_reg(10, 126);  // 1+2+3+4+5+6 => 0111 1110. We only care about unlock and rec_freq
 
     // set the AIF TX
     // bit 7:6 - always 0
@@ -229,17 +229,17 @@ void wm8805_poll_intstat(void) {
 
                 // switch PLL coeffs around to try to find stable setting
 
-                if (pll_mode) {
-                    puts("trying 192 kHz mode...");
-                    fs = 192;
-                    write_reg(6, 8);                  // set PLL_N to 8
-                    write_reg(5, 12);                 // set PLL_K to 0C49BA (0C)
-                    write_reg(4, 73);                 // set PLL_K to 0C49BA (49)
-                    write_reg(3, 186);                // set PLL_K to 0C49BA (BA)
-                    pll_mode = 0;
-                    //delay(500);
-                }
-                else {
+//                if (pll_mode) {
+//                    puts("trying 192 kHz mode...");
+//                    fs = 192;
+//                    write_reg(6, 8);                  // set PLL_N to 8
+//                    write_reg(5, 12);                 // set PLL_K to 0C49BA (0C)
+//                    write_reg(4, 73);                 // set PLL_K to 0C49BA (49)
+//                    write_reg(3, 186);                // set PLL_K to 0C49BA (BA)
+//                    pll_mode = 0;
+//                    //delay(500);
+//                }
+//                else {
                     //fs = 0;
                     puts("trying normal mode...");
                     write_reg(6, 7);                  // set PLL_N to 7
@@ -248,7 +248,7 @@ void wm8805_poll_intstat(void) {
                     write_reg(3, 33);                 // set PLL_K to 36FD21 (21)
                     pll_mode = 1;
                     //delay(500);
-                } // if toggle
+//                } // if toggle
 
 
             } // if (bitRead(SPDSTAT,6))
