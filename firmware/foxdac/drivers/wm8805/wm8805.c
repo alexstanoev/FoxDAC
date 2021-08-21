@@ -152,7 +152,7 @@ void wm8805_set_input(uint8_t input) {
 static uint8_t pll_mode = 0;
 static uint8_t fs = 0;
 
-static const char* sr_str = "N/A";
+static char* sr_str = "N/A";
 
 static const char* get_samplerate_str(void) {
     uint8_t samplerate = read_reg(16);
@@ -213,6 +213,7 @@ void wm8805_poll_intstat(void) {
     // but still useful for debugging
 
     uint8_t SPDSTAT = 0;
+
     if (bitRead(INTSTAT, 0)) {                                         // UPD_UNLOCK
         SPDSTAT = read_reg(12);
         puts("UPD_UNLOCK: ");
@@ -225,7 +226,8 @@ void wm8805_poll_intstat(void) {
 
                 puts("S/PDIF PLL unlocked");
 
-                ui_set_sr_text("PLL ERROR");
+                //sr_str = "NO SPDIF";
+                ui_set_sr_text("NO SPDIF");
 
                 // switch PLL coeffs around to try to find stable setting
 
@@ -241,12 +243,12 @@ void wm8805_poll_intstat(void) {
 //                }
 //                else {
                     //fs = 0;
-                    puts("trying normal mode...");
-                    write_reg(6, 7);                  // set PLL_N to 7
-                    write_reg(5, 54);                 // set PLL_K to 36FD21 (36)
-                    write_reg(4, 253);                // set PLL_K to 36FD21 (FD)
-                    write_reg(3, 33);                 // set PLL_K to 36FD21 (21)
-                    pll_mode = 1;
+//                    puts("trying normal mode...");
+//                    write_reg(6, 7);                  // set PLL_N to 7
+//                    write_reg(5, 54);                 // set PLL_K to 36FD21 (36)
+//                    write_reg(4, 253);                // set PLL_K to 36FD21 (FD)
+//                    write_reg(3, 33);                 // set PLL_K to 36FD21 (21)
+//                    pll_mode = 1;
                     //delay(500);
 //                } // if toggle
 
@@ -256,6 +258,48 @@ void wm8805_poll_intstat(void) {
         }
         else {
             puts("S/PDIF PLL locked");
+
+
+            SPDSTAT = read_reg(12);
+            int samplerate = 2*bitRead(SPDSTAT,5) + bitRead(SPDSTAT,4);      // calculate indicated rate
+            //Serial.print("UPD_REC_FREQ: ");
+            puts("Sample rate: ");
+
+            switch (samplerate) {
+            case 3:
+                puts("32 kHz");
+                ui_set_sr_text("32 kHz");
+                fs = 32;
+                write_reg(29, 0);                 // set SPD_192K_EN to 0
+                //delay(500);
+                break;
+
+            case 2:
+                puts("44 / 48 kHz");
+                ui_set_sr_text("44/48 kHz");
+                fs = 48;
+                write_reg(29, 0);                 // set SPD_192K_EN to 0
+                //delay(500);
+                break;
+
+            case 1:
+                puts("88 / 96 kHz");
+                ui_set_sr_text("88/96 kHz");
+                fs = 96;
+                write_reg(29, 0);                 // set SPD_192K_EN to 0
+                //delay(500);
+                break;
+
+            case 0:
+                puts("192 kHz");
+                ui_set_sr_text("192 kHz");
+                fs = 192;
+                write_reg(29, 128);                 // set SPD_192K_EN to 1
+                //delay(500);
+                break;
+            } // switch samplerate
+
+
         }
         //delay(50); // sort of debounce
     }
@@ -267,7 +311,7 @@ void wm8805_poll_intstat(void) {
     if (bitRead(INTSTAT, 2)) {                                         // INT_CSUD
         puts("INT_CSUD");
 
-        printf("CSU %x\n", read_reg(0x0D));
+        //printf("CSU %x\n", read_reg(0x0D));
     }
 
     if (bitRead(INTSTAT, 3)) {                                         // INT_TRANS_ERR
@@ -296,6 +340,7 @@ void wm8805_poll_intstat(void) {
         switch (samplerate) {
         case 3:
             puts("32 kHz");
+            ui_set_sr_text("32 kHz");
             fs = 32;
             write_reg(29, 0);                 // set SPD_192K_EN to 0
             //delay(500);
@@ -303,6 +348,7 @@ void wm8805_poll_intstat(void) {
 
         case 2:
             puts("44 / 48 kHz");
+            ui_set_sr_text("44/48 kHz");
             fs = 48;
             write_reg(29, 0);                 // set SPD_192K_EN to 0
             //delay(500);
@@ -310,6 +356,7 @@ void wm8805_poll_intstat(void) {
 
         case 1:
             puts("88 / 96 kHz");
+            ui_set_sr_text("88/96 kHz");
             fs = 96;
             write_reg(29, 0);                 // set SPD_192K_EN to 0
             //delay(500);
@@ -317,6 +364,7 @@ void wm8805_poll_intstat(void) {
 
         case 0:
             puts("192 kHz");
+            ui_set_sr_text("192 kHz");
             fs = 192;
             write_reg(29, 128);                 // set SPD_192K_EN to 1
             //delay(500);
@@ -324,20 +372,18 @@ void wm8805_poll_intstat(void) {
         } // switch samplerate
 
 
-        const char* new_sr_str = get_samplerate_str();
+        //const char* new_sr_str = get_samplerate_str();
 
-        if(sr_str != new_sr_str) {
-            sr_str = new_sr_str;
+        //if(sr_str != new_sr_str) {
+            //sr_str = new_sr_str;
 
-            printf("Detected SR: %s\n", sr_str);
+            //printf("Detected SR: %s\n", sr_str);
 
-            ui_set_sr_text(sr_str);
-        }
+            //ui_set_sr_text(new_sr_str);
+        //}
 
 
     } // if (bitRead(INTSTAT, 7))
-
-
 }
 
 

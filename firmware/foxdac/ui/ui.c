@@ -9,6 +9,7 @@
 #include "pico/time.h"
 #include "hardware/i2c.h"
 
+#include "../drivers/wm8805/wm8805.h"
 #include "../drivers/ssd1306/ssd1306.h"
 #include "../drivers/ssd1306/ssd1306_tests.h"
 
@@ -31,12 +32,7 @@ static void lv_init_ui(void) {
     lv_port_indev_init();
 }
 
-static bool lvgl_timer_cb(repeating_timer_t *rt) {
-    lv_task_handler();
-    return true;
-}
-
-static repeating_timer_t lv_timer;
+static repeating_timer_t lv_timer, wm_timer;
 
 static void buttons_init(void) {
     gpio_init(BTN_MENU);
@@ -124,6 +120,17 @@ static void buttons_read(void) {
     }
 }
 
+static bool lvgl_timer_cb(repeating_timer_t *rt) {
+    buttons_read();
+    lv_task_handler();
+    return true;
+}
+
+static bool wm_timer_cb(repeating_timer_t *rt) {
+    wm8805_poll_intstat();
+    return true;
+}
+
 void ui_init(void) {
     lv_init_ui();
 
@@ -133,11 +140,11 @@ void ui_init(void) {
 
     DAC_BuildPages();
 
-
     ui_select_input(0);
 
-    //alarm_pool_t* pool = alarm_pool_create(1, 1);
-    //alarm_pool_add_repeating_timer_ms(pool, 5, lvgl_timer_cb, NULL, &lv_timer);
+    alarm_pool_t* pool = alarm_pool_create(1, 5);
+    alarm_pool_add_repeating_timer_ms(pool, 5, lvgl_timer_cb, NULL, &lv_timer);
+    alarm_pool_add_repeating_timer_ms(pool, 100, wm_timer_cb, NULL, &wm_timer);
 
     spectrum_init();
 
@@ -146,6 +153,8 @@ void ui_init(void) {
     badapple_init();
 
     //badapple_start();
+
+    ui_set_vol_text(tpa6130_get_volume_str(10));
 }
 
 void __attribute__((noinline)) __scratch_x("ui_loop") ui_loop(void) {

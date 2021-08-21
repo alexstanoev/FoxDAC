@@ -45,7 +45,7 @@ static void VolumeSlider_eventhandler(lv_event_t * event)
 void UI_SetVolume(int32_t vol)
 {
     if(!ui_inited) return;
-    printf("v: %d\n", vol);
+    //printf("v: %d\n", vol);
     //lv_slider_set_value(VolumeSlider, vol, LV_ANIM_ON);
 }
 
@@ -76,9 +76,9 @@ void DAC_BuildPages(void)
     lv_obj_clear_state(VolumeSlider, LV_STATE_DISABLED);
 
     SamplFreqLbl = lv_label_create(MainUI);
-    lv_label_set_long_mode(SamplFreqLbl, LV_LABEL_LONG_CLIP);
+    lv_label_set_long_mode(SamplFreqLbl, LV_LABEL_LONG_SCROLL); // LV_LABEL_LONG_CLIP
     lv_obj_set_align(SamplFreqLbl, LV_TEXT_ALIGN_LEFT);
-    lv_label_set_text(SamplFreqLbl, "44.1 kHz");
+    lv_label_set_text(SamplFreqLbl, "");
     lv_obj_set_size(SamplFreqLbl, 77, 16);  // force: -23
     lv_obj_clear_state(SamplFreqLbl, LV_STATE_DISABLED);
 
@@ -87,11 +87,11 @@ void DAC_BuildPages(void)
     VolumeLbl = lv_label_create(MainUI);
     lv_label_set_long_mode(VolumeLbl, LV_LABEL_LONG_CLIP);
     lv_obj_set_align(VolumeLbl, LV_TEXT_ALIGN_RIGHT);
-    lv_label_set_text(VolumeLbl, "-5dB");
-    lv_obj_set_size(VolumeLbl, 34, 16);  // force: 44
+    lv_label_set_text(VolumeLbl, "");
+    lv_obj_set_size(VolumeLbl, 44, 16);  // force: 44
     lv_obj_clear_state(VolumeLbl, LV_STATE_DISABLED);
 
-    lv_obj_align(VolumeLbl, LV_ALIGN_CENTER, 44, -23); // force: 34
+    lv_obj_align(VolumeLbl, LV_ALIGN_CENTER, 39, -23); // force: 34
 
     UsbImg = lv_img_create(MainUI);
     lv_img_set_src(UsbImg, &img_usb_png);

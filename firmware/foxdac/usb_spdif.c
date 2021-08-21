@@ -269,7 +269,11 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
     DEBUG_PINS_SET(audio_timing, 1);
     // todo deal with blocking correctly
+
+    gpio_put(25, 1);
     struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
+    gpio_put(25, 0);
+
     DEBUG_PINS_CLR(audio_timing, 1);
     assert(!(usb_buffer->data_len & 3u));
     audio_buffer->sample_count = usb_buffer->data_len / 4;
@@ -286,6 +290,9 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     spectrum_consume_samples(out, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
+
+    //gpio_put(25, 0);
+
     // keep on truckin'
     usb_grow_transfer(ep->current_transfer, 1);
     usb_packet_done(ep);
@@ -637,25 +644,33 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
 
         //ui_init();
 
-        wm8805_poll_intstat();
+        //wm8805_poll_intstat();
 
-        ui_loop();
+        //ui_loop();
 
-        sleep_ms(3);
+        //sleep_ms(3);
 
-        //__wfi();
+        __wfi();
     }
 }
 
 void core0_worker() {
-
+    // Set regulator into PWM mode
     gpio_init(23);
     gpio_set_dir(23, GPIO_OUT);
     gpio_put(23, 1);
 
+    // Init board LED
+    gpio_init(25);
+    gpio_set_dir(25, GPIO_OUT);
+
+    // Init red LED
+    gpio_init(18);
+    gpio_set_dir(18, GPIO_OUT);
+
     //oled_init();
 
-    producer_pool = audio_new_producer_pool(&producer_format, 16, 96); // todo correct size
+    producer_pool = audio_new_producer_pool(&producer_format, 32, 96); // todo correct size
 
     bool __unused ok;
     const struct audio_format *output_format;
@@ -664,7 +679,7 @@ void core0_worker() {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    ok = audio_spdif_connect_extra(producer_pool, false, 4, NULL);
+    ok = audio_spdif_connect_extra(producer_pool, false, 8, NULL);
     assert(ok);
 
     usb_sound_card_init();
@@ -686,6 +701,7 @@ int main(void) {
     //else
     //  printf("system clock now 250MHz\n");
 
+    //bi_decl(bi_program_description("FoxDAC"));
 
     stdout_uart_init();
 
