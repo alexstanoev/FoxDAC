@@ -13,6 +13,7 @@
 #include "pico/multicore.h"
 #include "hardware/sync.h"
 #include "hardware/irq.h"
+#include "hardware/structs/bus_ctrl.h"
 #include "lufa/AudioClassCommon.h"
 
 #include "ui/ui.h"
@@ -264,6 +265,47 @@ static struct {
 
 static struct audio_buffer_pool *producer_pool;
 
+volatile uint32_t pio_samples_dma = 0, pio_prev_samples_dma = 0;
+int sof_runs = 0, sof_avg = 0;
+int overruns = 0;
+
+#define SOF_AVG_BUF_SIZE 50
+#define SOF_AVG_BUF_SIZE_F 50.0f
+static volatile uint8_t sof_dma_buf[SOF_AVG_BUF_SIZE];
+static volatile uint8_t sof_dma_buf_pos = 0, sof_dma_buf_filled = 0;
+
+static volatile uint32_t rate = 48000;
+
+void __not_in_flash_func(usb_sof_irq)(void) {
+    // handle feedback sample rate calculations @ SOF to sync up with USB clock
+    uint32_t new_samples = pio_samples_dma - pio_prev_samples_dma;
+    pio_prev_samples_dma = pio_samples_dma;
+
+    // we're racing audio_spdif_dma_irq_handler on the other core here
+    sof_dma_buf[sof_dma_buf_pos] = new_samples;
+
+    sof_dma_buf_pos++;
+    if(sof_dma_buf_pos == SOF_AVG_BUF_SIZE) {
+        sof_dma_buf_pos = 0;
+        sof_dma_buf_filled = 1;
+    }
+
+    if(sof_dma_buf_filled) {
+        uint32_t sof_avg = 0;
+        for(uint8_t i = 0; i < SOF_AVG_BUF_SIZE; i++) {
+            sof_avg += sof_dma_buf[i];
+        }
+
+        rate = (uint32_t) ((((float)sof_avg) / SOF_AVG_BUF_SIZE_F) * 192.0f * 1000.0f);
+    }
+
+//        // 0.230 for 44.1k, 0.250 for 48k, 0.500 for 96k
+//        // multiply by 192 (spdif frame size) to get rate
+
+
+    //gpio_put(18, !gpio_get(18));
+}
+
 static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     assert(ep->current_transfer);
     struct usb_buffer *usb_buffer = usb_current_out_packet_buffer(ep);
@@ -275,19 +317,21 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     gpio_put(25, 0);
 
     DEBUG_PINS_CLR(audio_timing, 1);
-    assert(!(usb_buffer->data_len & 3u));
+    //assert(!(usb_buffer->data_len & 3u));
     audio_buffer->sample_count = usb_buffer->data_len / 4;
-    assert(audio_buffer->sample_count);
-    assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
+    //assert(audio_buffer->sample_count);
+    //assert(audio_buffer->max_sample_count >= audio_buffer->sample_count);
     uint16_t vol_mul = audio_state.vol_mul;
     int16_t *out = (int16_t *) audio_buffer->buffer->bytes;
     int16_t *in = (int16_t *) usb_buffer->data;
 
-    for (int i = 0; i < audio_buffer->sample_count * 2; i++) {
-        out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
-    }
+    memcpy(out, in, usb_buffer->data_len);
 
-    spectrum_consume_samples(out, audio_buffer->sample_count);
+    //for (int i = 0; i < audio_buffer->sample_count * 2; i++) {
+    //    out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
+    //}
+
+    //spectrum_consume_samples(out, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
 
@@ -306,8 +350,12 @@ static void __not_in_flash_func(_as_sync_packet)(struct usb_endpoint *ep) {
     assert(buffer->data_max >= 3);
     buffer->data_len = 3;
 
+    int32_t diff = audio_state.freq - rate;
+
     // todo lie thru our teeth for now
     uint feedback = (audio_state.freq << 14u) / 1000u;
+    //uint feedback = (rate << 14u) / 1000u;
+    //uint feedback = ((audio_state.freq + diff) << 14u) / 1000u;
 
     buffer->data[0] = feedback;
     buffer->data[1] = feedback >> 8u;
@@ -316,6 +364,15 @@ static void __not_in_flash_func(_as_sync_packet)(struct usb_endpoint *ep) {
     // keep on truckin'
     usb_grow_transfer(ep->current_transfer, 1);
     usb_packet_done(ep);
+
+//    sof_runs++;
+//    if(sof_runs == 50) {
+//        sof_runs = 0;
+//        //sof_avg = 0;
+//
+//        //printf("%d\n", audio_state.freq + diff);
+//        printf("%d %d\n", rate, overruns);
+//    }
 }
 
 static const struct usb_transfer_type as_transfer_type = {
@@ -441,6 +498,9 @@ static void _audio_reconfigure() {
     }
     // todo hack overwriting const
     ((struct audio_format *) producer_pool->format)->sample_freq = audio_state.freq;
+    rate = audio_state.freq;
+    sof_dma_buf_filled = 0;
+    sof_dma_buf_pos = 0;
 }
 
 static void audio_set_volume(int16_t volume) {
@@ -580,8 +640,7 @@ void usb_sound_card_init() {
     static struct usb_endpoint *const op_endpoints[] = {
             &ep_op_out, &ep_op_sync
     };
-    usb_interface_init(&as_op_interface, &audio_device_config.as_op_interface, op_endpoints, count_of(op_endpoints),
-                       true);
+    usb_interface_init(&as_op_interface, &audio_device_config.as_op_interface, op_endpoints, count_of(op_endpoints), true);
     as_op_interface.set_alternate_handler = as_set_alternate;
     ep_op_out.setup_request_handler = _as_setup_request_handler;
     as_transfer.type = &as_transfer_type;
@@ -621,7 +680,7 @@ struct audio_buffer_format producer_format = {
         .sample_stride = 4
 };
 
-void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
+void core1_worker() {
     busy_wait_ms(50);
 
     oled_init();
@@ -635,6 +694,8 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
     ui_init();
     //restore_interrupts(primask);
 
+    //usb_sound_card_init();
+
     audio_spdif_set_enabled(true);
     irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 
@@ -646,11 +707,19 @@ void __attribute__((noinline)) __scratch_x("core1_worker") core1_worker() {
 
         //wm8805_poll_intstat();
 
-        //ui_loop();
+        if(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) {
+            // we're suspended, TODO turn off the OLED
+            ui_set_sr_text("SUSPEND");
+        } else {
+            // not suspended, wake up
+        }
 
-        //sleep_ms(3);
+        ui_loop();
 
-        __wfi();
+        sleep_ms(3);
+
+        //__wfi();
+
     }
 }
 
@@ -668,9 +737,14 @@ void core0_worker() {
     gpio_init(18);
     gpio_set_dir(18, GPIO_OUT);
 
+    // Grant high bus priority to the DMA, so it can shove the processors out
+    // of the way. This should only be needed if you are pushing things up to
+    // >16bits/clk here, i.e. if you need to saturate the bus completely.
+    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
+
     //oled_init();
 
-    producer_pool = audio_new_producer_pool(&producer_format, 32, 96); // todo correct size
+    producer_pool = audio_new_producer_pool(&producer_format, 16, 96); // todo correct size
 
     bool __unused ok;
     const struct audio_format *output_format;
@@ -679,58 +753,46 @@ void core0_worker() {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    ok = audio_spdif_connect_extra(producer_pool, false, 8, NULL);
+    ok = audio_spdif_connect_extra(producer_pool, false, 4, NULL);
     assert(ok);
 
     usb_sound_card_init();
 
-    irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
+    //irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
 
     wm8805_init();
     tpa6130_init();
+
+    //audio_spdif_set_enabled(true);
+    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 }
 
 int main(void) {
-    //set_sys_clock_48mhz();
-    //set_sys_clock_khz(96000, true);
+    // 17.2032 MHz is a common multiple for all three sample rates we do:
+    // https://www.electronicdesign.com/technologies/embedded-revolution/article/21801786/achieving-bitperfect-usb-audio
+    // 17.2032*10=172.032MHz is not exactly doable by the PLL but 172.0MHz is
+    // if we just ignore 44.1 instead, 192000 is a nice integer multiple for 48 and 96
 
-    set_sys_clock_khz(250000, true);
-
-    //if (!set_sys_clock_khz(250000, false))
-    //  printf("system clock 250MHz failed\n");
-    //else
-    //  printf("system clock now 250MHz\n");
+    set_sys_clock_khz(192000, true);
 
     //bi_decl(bi_program_description("FoxDAC"));
 
     stdout_uart_init();
 
     //gpio_debug_pins_init();
-    puts("USB SOUND CARD");
-
-#ifdef NDEBUG
-    for(uint i=0;i<count_of(audio_device_config.as_audio.format.freqs);i++) {
-        uint freq = audio_device_config.as_audio.format.freqs[i].Byte1 |
-                (audio_device_config.as_audio.format.freqs[i].Byte2 << 8u) |
-                (audio_device_config.as_audio.format.freqs[i].Byte3 << 16u);
-        assert(freq <= AUDIO_FREQ_MAX);
-    }
-#endif
 
     //usb_sound_card_init();
 
     core0_worker();
-
     multicore_launch_core1(core1_worker);
-    printf("HAHA %04x %04x %04x %04x\n", MIN_VOLUME, DEFAULT_VOLUME, MAX_VOLUME, VOLUME_RESOLUTION);
-    // MSD is irq driven
-    //while (1) __wfi();
 
     //audio_spdif_set_enabled(true);
 
     while (1) {
-        spectrum_core0_loop();
+        //spectrum_core0_loop();
         //busy_wait_ms(10);
-        __wfi();
+        //__wfi();
+        //ui_loop();
+        sleep_ms(5);
     }
 }

@@ -58,6 +58,8 @@ const audio_spdif_config_t audio_spdif_default_config = {
 #define PREAMBLE_Y 0b01101001
 #define PREAMBLE_Z 0b00111001
 
+//#define SPDIF_CONTROL_WORD 0x4
+
 #define SPDIF_CONTROL_WORD (\
     0x4 | /* copying allowed */ \
     0x20 | /* PCM encoder/decoder */ \
@@ -100,11 +102,11 @@ static void init_spdif_buffer(audio_buffer_t *buffer) {
 //        p->h = 0x55000000u | (c_bit << 25u) | 0x0055555555;
 //        p++;
 
-        p->l = (i ? PREAMBLE_X : PREAMBLE_Z) | 0b10101010101010100000000;
-        p->h = 0x55000000u | (c_bit << 25u);
+        p->l = (i ? PREAMBLE_X : PREAMBLE_Z) | 0b10101010101010100000000; // 0-7 preamble, 8-15 aux samp, 16 - 56 sample
+        p->h = 0x55000000u | (c_bit << 29u);                              // 0-24 sample low, 25 26 valid, 27 28 user data, 29 30 status
         p++;
         p->l = PREAMBLE_Y | 0b10101010101010100000000;
-        p->h = 0x55000000u | (c_bit << 25u);
+        p->h = 0x55000000u | (c_bit << 29u); // 25 -> 29
         p++;
 
     }
@@ -306,24 +308,44 @@ bool audio_spdif_connect_s8(audio_buffer_pool_t *producer) {
     return true;
 }
 
-static inline void audio_start_dma_transfer() {
+static void __time_critical_func(audio_start_dma_transfer)() {
     assert(!shared_state.playing_buffer);
     audio_buffer_t *ab = take_audio_buffer(audio_spdif_consumer, false);
 
     shared_state.playing_buffer = ab;
     if (!ab) {
-        DEBUG_PINS_XOR(audio_timing, 1);
-        DEBUG_PINS_XOR(audio_timing, 2);
-        DEBUG_PINS_XOR(audio_timing, 1);
+
+        gpio_put(18, 1);
+
+//gpio_put(28, !gpio_get(28));
+//gpio_put(28, !gpio_get(28));
+//gpio_put(28, !gpio_get(28));
+//gpio_put(28, !gpio_get(28));
+
+        //DEBUG_PINS_XOR(audio_timing, 1);
+        //DEBUG_PINS_XOR(audio_timing, 2);
+        //DEBUG_PINS_XOR(audio_timing, 1);
         //DEBUG_PINS_XOR(audio_timing, 2);
         // just play some silence
         ab = &silence_buffer;
+
+        extern int overruns;
+        overruns++;
+
+
+        // TODO led
+        //printf("UNDERRUN\n");
+    } else {
+        gpio_put(18, 0);
+
     }
-    assert(ab->sample_count);
+
+    //assert(ab->sample_count);
     // todo better naming of format->format->format!!
-    assert(ab->format->format->format == AUDIO_BUFFER_FORMAT_PIO_SPDIF);
-    assert(ab->format->format->channel_count == 2);
-    assert(ab->format->sample_stride == 2 * sizeof(spdif_subframe_t));
+    //assert(ab->format->format->format == AUDIO_BUFFER_FORMAT_PIO_SPDIF);
+    //assert(ab->format->format->channel_count == 2);
+    //assert(ab->format->sample_stride == 2 * sizeof(spdif_subframe_t));
+
     dma_channel_transfer_from_buffer_now(shared_state.dma_channel, ab->buffer->bytes, ab->sample_count * 4);
 }
 
@@ -335,9 +357,13 @@ void __isr __time_critical_func(audio_spdif_dma_irq_handler)() {
     uint dma_channel = shared_state.dma_channel;
     if (dma_irqn_get_channel_status(PICO_AUDIO_SPDIF_DMA_IRQ, dma_channel)) {
         dma_irqn_acknowledge_channel(PICO_AUDIO_SPDIF_DMA_IRQ, dma_channel);
+//gpio_put(28, 1);
         DEBUG_PINS_SET(audio_timing, 4);
         // free the buffer we just finished
         if (shared_state.playing_buffer) {
+            extern volatile uint32_t pio_samples_dma;
+            pio_samples_dma++;
+
             give_audio_buffer(audio_spdif_consumer, shared_state.playing_buffer);
 #ifndef NDEBUG
             shared_state.playing_buffer = NULL;
@@ -345,6 +371,7 @@ void __isr __time_critical_func(audio_spdif_dma_irq_handler)() {
         }
         audio_start_dma_transfer();
         DEBUG_PINS_CLR(audio_timing, 4);
+//gpio_put(28, 0);
     }
 #endif
 }

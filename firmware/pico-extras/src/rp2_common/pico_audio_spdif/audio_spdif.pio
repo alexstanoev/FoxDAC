@@ -20,6 +20,7 @@ void spdif_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_out_shift(&sm_config, true, true, 32);
     sm_config_set_sideset(&sm_config, 1, false, false);
     sm_config_set_sideset_pins(&sm_config, pin);
+    sm_config_set_fifo_join(&sm_config, PIO_FIFO_JOIN_TX);
     pio_sm_init(pio, sm, offset, &sm_config);
     pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
     pio_sm_set_pins(pio, sm, 0);

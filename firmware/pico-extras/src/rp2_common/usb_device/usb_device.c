@@ -1019,6 +1019,13 @@ void __isr __used isr_usbctrl(void) {
         rp2040_usb_device_enumeration_fix();
     }
 
+    if (status & USB_INTS_DEV_SOF_BITS) {
+        handled |= USB_INTS_DEV_SOF_BITS;
+        volatile uint unused = usb_hw->sof_rd; // clear SOF interrupt
+        extern void __not_in_flash_func(usb_sof_irq)(void);
+        usb_sof_irq();
+    }
+
     if (status & USB_INTS_ERROR_BITS) {
         handled |= (status & USB_INTS_ERROR_BITS);
 #ifndef NDEBUG
@@ -1240,7 +1247,7 @@ void usb_device_start() {
     usb_hw->sie_ctrl = USB_SIE_CTRL_PULLUP_EN_BITS | USB_SIE_CTRL_EP0_INT_1BUF_BITS;
     // Present pull up before enabling bus reset irq
     usb_hw->inte = USB_INTS_BUFF_STATUS_BITS | USB_INTS_BUS_RESET_BITS | USB_INTS_SETUP_REQ_BITS |
-                   USB_INTS_ERROR_BITS;// | USB_INTS_EP_STALL_NAK_BITS;
+                   USB_INTS_ERROR_BITS | USB_INTS_DEV_SOF_BITS;// | USB_INTS_EP_STALL_NAK_BITS;
 
     irq_set_enabled(USBCTRL_IRQ, true);
 }

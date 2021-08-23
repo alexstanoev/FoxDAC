@@ -1,6 +1,8 @@
 if (TARGET usb_device)
     PROJECT(foxdac)
 
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+
     add_executable(foxdac usb_spdif.c)
             
     add_subdirectory(drivers)
