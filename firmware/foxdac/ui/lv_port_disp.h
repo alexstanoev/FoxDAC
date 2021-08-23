@@ -30,6 +30,8 @@ extern "C" {
  * GLOBAL PROTOTYPES
  **********************/
 
+void lv_port_disp_init(void);
+
 /**********************
  *      MACROS
  **********************/

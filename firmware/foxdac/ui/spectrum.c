@@ -62,20 +62,16 @@ void spectrum_consume_samples(int16_t* samples, uint32_t sample_count) {
 
     for (int i = 0; i < sample_count * 2; i += 2) {
         // average channels
-        fft_in[fft_in_pos++] = hanningWindow((float) samples[i], fft_in_pos - 1, NSAMP); //(((float) samples[i]) + ((float) samples[i + 1])) / 2.0f;
-
-        //fft_in_pos++;
-
-        //fft_in[fft_in_pos++] = (float) samples[i];
+        //fft_in[fft_in_pos++] = hanningWindow((float) samples[i], fft_in_pos - 1, NSAMP); //(((float) samples[i]) + ((float) samples[i + 1])) / 2.0f;
+        fft_in[fft_in_pos++] = (float) samples[i];
 
         if(fft_in_pos == NSAMP) {
             return;
         }
-        //printf("%d %f \n", samples[i], fft_in[fft_in_pos - 1]);
     }
 }
 
-void spectrum_core0_loop(void) {
+void spectrum_loop(void) {
     if(!spectrum_running || fft_in_pos != NSAMP || j < N) return;
 
     // compute fast fourier transform
@@ -84,8 +80,6 @@ void spectrum_core0_loop(void) {
     // compute power and calculate max freq component
     float max_power = 0;
     int max_idx = 0;
-    // any frequency bin over NSAMP/2 is aliased (nyquist sampling theorum)
-    // skip DC and go up to 41 instead of NSAMP/2
     for (int i = 0; i < 40; i++) {
         float power = 20 * log10(sqrtf(fft_out[i].r * fft_out[i].r + fft_out[i].i * fft_out[i].i) / 40.0f);
 
@@ -106,23 +100,7 @@ void spectrum_core0_loop(void) {
     //kiss_fft_free(cfg);
 }
 
-
-
-
 static void redraw_bars(lv_timer_t * timer) {
-    //    runs++;
-    //
-    //    if(runs == 3) {
-    //        runs = 0;
-    //        j = 0;
-    //        for(int i = 0; i < 41; i++) {
-    //            old_value_array[i] = target_value_array[i];
-    //            target_value_array[i] = lv_rand(0, 64);
-    //        }
-    //    }
-
-    //spectrum_core0_loop();
-
     if(j < N) {
         float fac = ((float) j) / ((float) N);
         float lerp = fac * fac * (3.0f - 2.0f * fac);

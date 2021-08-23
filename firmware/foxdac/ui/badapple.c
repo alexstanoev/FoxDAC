@@ -4,6 +4,7 @@
 
 #include "lvgl/lvgl.h"
 
+#include "pico/time.h"
 #include "../drivers/ssd1306/ssd1306.h"
 
 #define BAD_APPLE 1
@@ -19,7 +20,10 @@ static uint32_t fr_byte_idx = 2;
 static uint32_t cur_frame = 0;
 static uint8_t running = 0;
 
-static lv_timer_t * timer;
+static uint8_t next_frame_flag = false;
+
+static repeating_timer_t badapple_timer;
+extern alarm_pool_t* core1_alarm_pool;
 
 // https://rosettacode.org/wiki/Run-length_encoding/C
 static int32_t rle_decode(uint8_t *out, const uint8_t *in, int32_t l) {
@@ -37,21 +41,25 @@ static int32_t rle_decode(uint8_t *out, const uint8_t *in, int32_t l) {
   return tb;
 }
 
-void badapple_start(void)
-{
+static bool badapple_next_frame_cb(repeating_timer_t *rt) {
+    next_frame_flag = 1;
+    return true;
+}
+
+void badapple_start(void) {
     // big hack
     extern uint8_t lv_port_pause_drawing;
     lv_port_pause_drawing = 1;
 
-    lv_timer_resume(timer);
+    //lv_timer_resume(timer);
+    alarm_pool_add_repeating_timer_us(core1_alarm_pool, 41666, badapple_next_frame_cb, NULL, &badapple_timer);
 
     cur_frame = 0;
     fr_byte_idx = 2;
     running = 1;
 }
 
-void badapple_stop(void)
-{
+void badapple_stop(void) {
     // undo big hack
     extern uint8_t lv_port_pause_drawing;
     lv_port_pause_drawing = 0;
@@ -59,14 +67,20 @@ void badapple_stop(void)
     cur_frame = 0;
     fr_byte_idx = 2;
     running = 0;
+    next_frame_flag = 0;
 
-    lv_timer_pause(timer);
+    cancel_repeating_timer(&badapple_timer);
 
     lv_obj_invalidate(lv_scr_act());
     lv_refr_now(lv_disp_get_default());
 }
 
-static void badapple_next_frame(lv_timer_t * timer) {
+void badapple_next_frame(void) {
+    if(!running || !next_frame_flag) {
+        return;
+    }
+    next_frame_flag = 0;
+
     extern uint8_t SSD1306_Buffer[SSD1306_BUFFER_SIZE];
 
     int32_t rle_len = (((int32_t) badapple[fr_byte_idx - 2]) << 8) | ((int32_t) badapple[fr_byte_idx - 1]);
@@ -84,7 +98,3 @@ static void badapple_next_frame(lv_timer_t * timer) {
     ssd1306_UpdateScreen();
 }
 
-void badapple_init(void) {
-    timer = lv_timer_create(badapple_next_frame, 41, NULL); // 24fps = 41.6ms
-    lv_timer_pause(timer);
-}

@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include "pico/stdlib.h"
 #include "pico/usb_device.h"
@@ -19,22 +20,19 @@
 #include "ui/ui.h"
 
 #include "drivers/wm8805/wm8805.h"
-
-// todo forget why this is using core 1 for sound: presumably not necessary
-// todo noop when muted
+#include "drivers/tpa6130/tpa6130.h"
 
 CU_REGISTER_DEBUG_PINS(audio_timing)
 
 // ---- select at most one ---
 //CU_SELECT_DEBUG_PINS(audio_timing)
 
-// todo make descriptor strings should probably belong to the configs
 static char *descriptor_strings[] =
-        {
-                "astanoev.com",
-                "FoxDAC",
-                "0123456789AB"
-        };
+{
+        "astanoev.com",
+        "FoxDAC",
+        "0123456789AB"
+};
 
 // todo fix these
 #define VENDOR_ID   0x2e8au
@@ -47,7 +45,6 @@ static char *descriptor_strings[] =
 #define AUDIO_SAMPLE_FREQ(frq) (uint8_t)(frq), (uint8_t)((frq >> 8)), (uint8_t)((frq >> 16))
 
 #define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(((freq + 999) / 1000) * 4)
-//#define AUDIO_MAX_PACKET_SIZE(freq) (uint8_t)(96)
 
 #define FEATURE_MUTE_CONTROL 1u
 #define FEATURE_VOLUME_CONTROL 2u
@@ -263,6 +260,8 @@ static struct {
         .freq = 44100,
 };
 
+#define AUDIO_BUFFER_COUNT 32
+
 static struct audio_buffer_pool *producer_pool;
 
 volatile uint32_t pio_samples_dma = 0, pio_prev_samples_dma = 0;
@@ -299,8 +298,8 @@ void __not_in_flash_func(usb_sof_irq)(void) {
         rate = (uint32_t) ((((float)sof_avg) / SOF_AVG_BUF_SIZE_F) * 192.0f * 1000.0f);
     }
 
-//        // 0.230 for 44.1k, 0.250 for 48k, 0.500 for 96k
-//        // multiply by 192 (spdif frame size) to get rate
+    //        // 0.230 for 44.1k, 0.250 for 48k, 0.500 for 96k
+    //        // multiply by 192 (spdif frame size) to get rate
 
 
     //gpio_put(18, !gpio_get(18));
@@ -331,7 +330,7 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     //    out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
     //}
 
-    //spectrum_consume_samples(out, audio_buffer->sample_count);
+    spectrum_consume_samples(out, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
 
@@ -365,14 +364,14 @@ static void __not_in_flash_func(_as_sync_packet)(struct usb_endpoint *ep) {
     usb_grow_transfer(ep->current_transfer, 1);
     usb_packet_done(ep);
 
-//    sof_runs++;
-//    if(sof_runs == 50) {
-//        sof_runs = 0;
-//        //sof_avg = 0;
-//
-//        //printf("%d\n", audio_state.freq + diff);
-//        printf("%d %d\n", rate, overruns);
-//    }
+    //    sof_runs++;
+    //    if(sof_runs == 50) {
+    //        sof_runs = 0;
+    //        //sof_avg = 0;
+    //
+    //        //printf("%d\n", audio_state.freq + diff);
+    //        printf("%d %d\n", rate, overruns);
+    //    }
 }
 
 static const struct usb_transfer_type as_transfer_type = {
@@ -393,15 +392,15 @@ static bool do_get_current(struct usb_setup_packet *setup) {
 
     if ((setup->bmRequestType & USB_REQ_TYPE_RECIPIENT_MASK) == USB_REQ_TYPE_RECIPIENT_INTERFACE) {
         switch (setup->wValue >> 8u) {
-            case FEATURE_MUTE_CONTROL: {
-                usb_start_tiny_control_in_transfer(audio_state.mute, 1);
-                return true;
-            }
-            case FEATURE_VOLUME_CONTROL: {
-                /* Current volume. See UAC Spec 1.0 p.77 */
-                usb_start_tiny_control_in_transfer(audio_state.volume, 2);
-                return true;
-            }
+        case FEATURE_MUTE_CONTROL: {
+            usb_start_tiny_control_in_transfer(audio_state.mute, 1);
+            return true;
+        }
+        case FEATURE_VOLUME_CONTROL: {
+            /* Current volume. See UAC Spec 1.0 p.77 */
+            usb_start_tiny_control_in_transfer(audio_state.volume, 2);
+            return true;
+        }
         }
     } else if ((setup->bmRequestType & USB_REQ_TYPE_RECIPIENT_MASK) == USB_REQ_TYPE_RECIPIENT_ENDPOINT) {
         if ((setup->wValue >> 8u) == ENDPOINT_FREQ_CONTROL) {
@@ -443,10 +442,10 @@ static bool do_get_minimum(struct usb_setup_packet *setup) {
     usb_debug("AUDIO_REQ_GET_MIN\n");
     if ((setup->bmRequestType & USB_REQ_TYPE_RECIPIENT_MASK) == USB_REQ_TYPE_RECIPIENT_INTERFACE) {
         switch (setup->wValue >> 8u) {
-            case FEATURE_VOLUME_CONTROL: {
-                usb_start_tiny_control_in_transfer(MIN_VOLUME, 2);
-                return true;
-            }
+        case FEATURE_VOLUME_CONTROL: {
+            usb_start_tiny_control_in_transfer(MIN_VOLUME, 2);
+            return true;
+        }
         }
     }
     return false;
@@ -456,10 +455,10 @@ static bool do_get_maximum(struct usb_setup_packet *setup) {
     usb_debug("AUDIO_REQ_GET_MAX\n");
     if ((setup->bmRequestType & USB_REQ_TYPE_RECIPIENT_MASK) == USB_REQ_TYPE_RECIPIENT_INTERFACE) {
         switch (setup->wValue >> 8u) {
-            case FEATURE_VOLUME_CONTROL: {
-                usb_start_tiny_control_in_transfer(MAX_VOLUME, 2);
-                return true;
-            }
+        case FEATURE_VOLUME_CONTROL: {
+            usb_start_tiny_control_in_transfer(MAX_VOLUME, 2);
+            return true;
+        }
         }
     }
     return false;
@@ -469,10 +468,10 @@ static bool do_get_resolution(struct usb_setup_packet *setup) {
     usb_debug("AUDIO_REQ_GET_RES\n");
     if ((setup->bmRequestType & USB_REQ_TYPE_RECIPIENT_MASK) == USB_REQ_TYPE_RECIPIENT_INTERFACE) {
         switch (setup->wValue >> 8u) {
-            case FEATURE_VOLUME_CONTROL: {
-                usb_start_tiny_control_in_transfer(VOLUME_RESOLUTION, 2);
-                return true;
-            }
+        case FEATURE_VOLUME_CONTROL: {
+            usb_start_tiny_control_in_transfer(VOLUME_RESOLUTION, 2);
+            return true;
+        }
         }
     }
     return false;
@@ -489,12 +488,12 @@ static struct audio_control_cmd {
 
 static void _audio_reconfigure() {
     switch (audio_state.freq) {
-        case 44100:
-        case 48000:
-        case 96000:
-            break;
-        default:
-            audio_state.freq = 44100;
+    case 44100:
+    case 48000:
+    case 96000:
+        break;
+    default:
+        audio_state.freq = 44100;
     }
     // todo hack overwriting const
     ((struct audio_format *) producer_pool->format)->sample_freq = audio_state.freq;
@@ -513,7 +512,7 @@ static void audio_set_volume(int16_t volume) {
     UI_SetVolume(((uint16_t)volume) >> 8u); // 0 to 23296 -> 0 to 91
 
     audio_state.vol_mul = db_to_vol[((uint16_t)volume) >> 8u];
-//    printf("VOL MUL %04x\n", audio_state.vol_mul);
+    //    printf("VOL MUL %04x\n", audio_state.vol_mul);
 }
 
 static void audio_cmd_packet(struct usb_endpoint *ep) {
@@ -523,15 +522,15 @@ static void audio_cmd_packet(struct usb_endpoint *ep) {
     if (buffer->data_len >= audio_control_cmd_t.len) {
         if (audio_control_cmd_t.type == USB_REQ_TYPE_RECIPIENT_INTERFACE) {
             switch (audio_control_cmd_t.cs) {
-                case FEATURE_MUTE_CONTROL: {
-                    audio_state.mute = buffer->data[0];
-                    usb_warn("Set Mute %d\n", buffer->data[0]);
-                    break;
-                }
-                case FEATURE_VOLUME_CONTROL: {
-                    audio_set_volume(*(int16_t *) buffer->data);
-                    break;
-                }
+            case FEATURE_MUTE_CONTROL: {
+                audio_state.mute = buffer->data[0];
+                usb_warn("Set Mute %d\n", buffer->data[0]);
+                break;
+            }
+            case FEATURE_VOLUME_CONTROL: {
+                audio_set_volume(*(int16_t *) buffer->data);
+                break;
+            }
             }
 
         } else if (audio_control_cmd_t.type == USB_REQ_TYPE_RECIPIENT_ENDPOINT) {
@@ -584,23 +583,23 @@ static bool ac_setup_request_handler(__unused struct usb_interface *interface, s
     setup = __builtin_assume_aligned(setup, 4);
     if (USB_REQ_TYPE_TYPE_CLASS == (setup->bmRequestType & USB_REQ_TYPE_TYPE_MASK)) {
         switch (setup->bRequest) {
-            case AUDIO_REQ_SetCurrent:
-                return do_set_current(setup);
+        case AUDIO_REQ_SetCurrent:
+            return do_set_current(setup);
 
-            case AUDIO_REQ_GetCurrent:
-                return do_get_current(setup);
+        case AUDIO_REQ_GetCurrent:
+            return do_get_current(setup);
 
-            case AUDIO_REQ_GetMinimum:
-                return do_get_minimum(setup);
+        case AUDIO_REQ_GetMinimum:
+            return do_get_minimum(setup);
 
-            case AUDIO_REQ_GetMaximum:
-                return do_get_maximum(setup);
+        case AUDIO_REQ_GetMaximum:
+            return do_get_maximum(setup);
 
-            case AUDIO_REQ_GetResolution:
-                return do_get_resolution(setup);
+        case AUDIO_REQ_GetResolution:
+            return do_get_resolution(setup);
 
-            default:
-                break;
+        default:
+            break;
         }
     }
     return false;
@@ -610,23 +609,23 @@ bool _as_setup_request_handler(__unused struct usb_endpoint *ep, struct usb_setu
     setup = __builtin_assume_aligned(setup, 4);
     if (USB_REQ_TYPE_TYPE_CLASS == (setup->bmRequestType & USB_REQ_TYPE_TYPE_MASK)) {
         switch (setup->bRequest) {
-            case AUDIO_REQ_SetCurrent:
-                return do_set_current(setup);
+        case AUDIO_REQ_SetCurrent:
+            return do_set_current(setup);
 
-            case AUDIO_REQ_GetCurrent:
-                return do_get_current(setup);
+        case AUDIO_REQ_GetCurrent:
+            return do_get_current(setup);
 
-            case AUDIO_REQ_GetMinimum:
-                return do_get_minimum(setup);
+        case AUDIO_REQ_GetMinimum:
+            return do_get_minimum(setup);
 
-            case AUDIO_REQ_GetMaximum:
-                return do_get_maximum(setup);
+        case AUDIO_REQ_GetMaximum:
+            return do_get_maximum(setup);
 
-            case AUDIO_REQ_GetResolution:
-                return do_get_resolution(setup);
+        case AUDIO_REQ_GetResolution:
+            return do_get_resolution(setup);
 
-            default:
-                break;
+        default:
+            break;
         }
     }
     return false;
@@ -653,12 +652,12 @@ void usb_sound_card_init() {
             &as_op_interface,
     };
     __unused struct usb_device *device = usb_device_init(&boot_device_descriptor, &audio_device_config.descriptor,
-                                                         boot_device_interfaces, count_of(boot_device_interfaces),
-                                                         _get_descriptor_string);
+            boot_device_interfaces, count_of(boot_device_interfaces),
+            _get_descriptor_string);
     assert(device);
     audio_set_volume(DEFAULT_VOLUME);
     _audio_reconfigure();
-//    device->on_configure = _on_configure;
+    //    device->on_configure = _on_configure;
     usb_device_start();
 }
 
@@ -680,33 +679,25 @@ struct audio_buffer_format producer_format = {
         .sample_stride = 4
 };
 
-void core1_worker() {
-    busy_wait_ms(50);
+// Core split:
+// core 0 handles high-priority tasks: USB and SPDIF IRQs
+// core 1 handles low-priority tasks: LVGL, OLED, WM8805 polling and TPA6130 volume
 
+static void core1_worker() {
+    // Init the oled twice, in case the first time glitched
+    busy_wait_ms(50);
+    oled_init();
+    busy_wait_ms(50);
     oled_init();
 
-    busy_wait_ms(50);
-
-    oled_init();
-
-    //uint32_t primask = save_and_disable_interrupts();
-    // the OLED gets upset if it gets interrupted during init
+    // Init LVGL and all screens
     ui_init();
-    //restore_interrupts(primask);
 
-    //usb_sound_card_init();
-
-    audio_spdif_set_enabled(true);
-    irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
+    // Start up the SPDIF PIO (core 1)
+    //audio_spdif_set_enabled(true);
+    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 
     while(1) {
-        //puts("looping");
-        //tight_loop_contents();
-
-        //ui_init();
-
-        //wm8805_poll_intstat();
-
         if(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) {
             // we're suspended, TODO turn off the OLED
             ui_set_sr_text("SUSPEND");
@@ -716,14 +707,11 @@ void core1_worker() {
 
         ui_loop();
 
-        sleep_ms(3);
-
-        //__wfi();
-
+        __wfi();
     }
 }
 
-void core0_worker() {
+void core0_init() {
     // Set regulator into PWM mode
     gpio_init(23);
     gpio_set_dir(23, GPIO_OUT);
@@ -737,33 +725,31 @@ void core0_worker() {
     gpio_init(18);
     gpio_set_dir(18, GPIO_OUT);
 
-    // Grant high bus priority to the DMA, so it can shove the processors out
-    // of the way. This should only be needed if you are pushing things up to
-    // >16bits/clk here, i.e. if you need to saturate the bus completely.
-    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
+    // Grant high bus priority to the DMA and core 0 (running all audio interrupts)
+    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS | BUSCTRL_BUS_PRIORITY_PROC0_BITS;
 
-    //oled_init();
+    producer_pool = audio_new_producer_pool(&producer_format, AUDIO_BUFFER_COUNT, 96);
 
-    producer_pool = audio_new_producer_pool(&producer_format, 16, 96); // todo correct size
-
-    bool __unused ok;
     const struct audio_format *output_format;
     output_format = audio_spdif_setup(&audio_format_48k, &config);
     if (!output_format) {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    ok = audio_spdif_connect_extra(producer_pool, false, 4, NULL);
+    bool __unused ok = audio_spdif_connect_extra(producer_pool, false, AUDIO_BUFFER_COUNT / 2, NULL);
     assert(ok);
 
     usb_sound_card_init();
-
     //irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
 
+    // Init the WM8805 SPDIF receiver
     wm8805_init();
+
+    // Init the TPA6130 headphone amp
     tpa6130_init();
 
-    //audio_spdif_set_enabled(true);
+    // Start up the SPDIF PIO (core 0)
+    audio_spdif_set_enabled(true);
     //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 }
 
@@ -772,27 +758,19 @@ int main(void) {
     // https://www.electronicdesign.com/technologies/embedded-revolution/article/21801786/achieving-bitperfect-usb-audio
     // 17.2032*10=172.032MHz is not exactly doable by the PLL but 172.0MHz is
     // if we just ignore 44.1 instead, 192000 is a nice integer multiple for 48 and 96
-
+    // ideally the core would run at 96MHz to avoid running overclocked, but this seems to be fine
     set_sys_clock_khz(192000, true);
 
-    //bi_decl(bi_program_description("FoxDAC"));
-
+    // Debug UART
     stdout_uart_init();
 
-    //gpio_debug_pins_init();
+    // Init H/W and USB audio
+    core0_init();
 
-    //usb_sound_card_init();
-
-    core0_worker();
+    // Run low-priority UI core
     multicore_launch_core1(core1_worker);
 
-    //audio_spdif_set_enabled(true);
-
     while (1) {
-        //spectrum_core0_loop();
-        //busy_wait_ms(10);
-        //__wfi();
-        //ui_loop();
-        sleep_ms(5);
+        __wfi();
     }
 }

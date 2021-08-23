@@ -64,7 +64,7 @@ static int32_t last_captured_count         = 0;
 
 static const PIO enc_pio = pio1;
 
-static void microstep_up(int32_t time) {
+static void __not_in_flash_func(microstep_up)(int32_t time) {
 	count++;
 	time_since = time;
 	microstep_time = 0;
@@ -75,7 +75,7 @@ static void microstep_up(int32_t time) {
 		cumulative_time += time;
 }
 
-static void microstep_down(int32_t time) {
+static void __not_in_flash_func(microstep_down)(int32_t time) {
 	count--;
 	time_since = 0 - time;
 	microstep_time = 0;

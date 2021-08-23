@@ -10,17 +10,16 @@
 #include "hardware/i2c.h"
 
 #include "../drivers/wm8805/wm8805.h"
+#include "../drivers/tpa6130/tpa6130.h"
 #include "../drivers/ssd1306/ssd1306.h"
-#include "../drivers/ssd1306/ssd1306_tests.h"
-
 #include "../drivers/encoder/encoder.h"
 
 #include "lvgl/lvgl.h"
 #include "lv_port_disp.h"
 #include "lv_port_indev.h"
 
+#include "ui.h"
 #include "spectrum.h"
-
 #include "dac_lvgl_ui.h"
 
 #define BTN_MENU 26
@@ -51,6 +50,10 @@ static uint8_t btn_ok_lpf = 0, btn_menu_lpf = 0, btn_ok_press = 0, btn_menu_pres
 
 static uint8_t cur_input = 0, cur_screen = 0;
 static uint8_t input_to_wm[INPUT_COUNT] = { 3, 0, 1, 2 };
+
+static uint8_t do_wm_tick = 0, do_lvgl_tick = 0;
+
+alarm_pool_t* core1_alarm_pool;
 
 static void buttons_read(void) {
     //btn_menu_lpf = (btn_menu_lpf * 9 + (!gpio_get(BTN_MENU)) * 10) / 10;
@@ -121,13 +124,13 @@ static void buttons_read(void) {
 }
 
 static bool lvgl_timer_cb(repeating_timer_t *rt) {
-    buttons_read();
-    lv_task_handler();
+    do_lvgl_tick = 1;
+
     return true;
 }
 
 static bool wm_timer_cb(repeating_timer_t *rt) {
-    wm8805_poll_intstat();
+    do_wm_tick = 1;
     return true;
 }
 
@@ -135,30 +138,32 @@ void ui_init(void) {
     lv_init_ui();
 
     buttons_init();
-
     encoder_init();
 
     DAC_BuildPages();
 
     ui_select_input(0);
+    ui_set_vol_text(tpa6130_get_volume_str(10));
 
-    alarm_pool_t* pool = alarm_pool_create(1, 5);
-    alarm_pool_add_repeating_timer_ms(pool, 5, lvgl_timer_cb, NULL, &lv_timer);
-    alarm_pool_add_repeating_timer_ms(pool, 100, wm_timer_cb, NULL, &wm_timer);
+    core1_alarm_pool = alarm_pool_create(1, 5);
+    alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 5, lvgl_timer_cb, NULL, &lv_timer);
+    alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 100, wm_timer_cb, NULL, &wm_timer);
 
     spectrum_init();
-
-    //spectrum_start();
-
-    badapple_init();
-
-    //badapple_start();
-
-    ui_set_vol_text(tpa6130_get_volume_str(10));
 }
 
-void __attribute__((noinline)) __scratch_x("ui_loop") ui_loop(void) {
-    buttons_read();
-    lv_task_handler();
-    //sleep_ms(5);
+void __not_in_flash_func(ui_loop)(void) {
+    if(do_wm_tick) {
+        do_wm_tick = 0;
+        wm8805_poll_intstat();
+    }
+
+    if(do_lvgl_tick) {
+        do_lvgl_tick = 0;
+        buttons_read();
+        spectrum_loop();
+        lv_task_handler();
+    }
+
+     badapple_next_frame();
 }

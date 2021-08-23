@@ -12,8 +12,8 @@ void oled_init(void);
 void ui_init(void);
 void ui_loop(void);
 
-void badapple_init(void);
 void badapple_start(void);
 void badapple_stop(void);
+void badapple_next_frame(void);
 
 #endif /* FOXDAC_UI_H_ */

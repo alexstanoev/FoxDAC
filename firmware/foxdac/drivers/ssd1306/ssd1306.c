@@ -48,7 +48,7 @@ void ssd1306_Reset(void) {
 // Send a byte to the command register
 void ssd1306_WriteCommand(uint8_t byte) {
 	uint8_t buf[] = { 0x00, byte };
-    int ret = i2c_write_blocking_until(SSD1306_I2C_PORT, SSD1306_I2C_ADDR, buf, 2, false, make_timeout_time_ms(100));
+    int ret = i2c_write_blocking_until(SSD1306_I2C_PORT, SSD1306_I2C_ADDR, buf, 2, false, make_timeout_time_ms(10));
     //if(ret) printf("i2c ret %d\n", ret);
 }
 
@@ -58,7 +58,7 @@ void ssd1306_WriteData(uint8_t* buffer, size_t buff_size) {
 	uint8_t addr = 0x40;
 	tmpbuf[0] = addr;
 	memcpy(&tmpbuf[1], buffer, buff_size);
-	i2c_write_blocking_until(SSD1306_I2C_PORT, SSD1306_I2C_ADDR, tmpbuf, buff_size + 1, false, make_timeout_time_ms(100));
+	i2c_write_blocking_until(SSD1306_I2C_PORT, SSD1306_I2C_ADDR, tmpbuf, buff_size + 1, false, make_timeout_time_ms(10));
 	//i2c_write_blocking(SSD1306_I2C_PORT, SSD1306_I2C_ADDR, &addr, 1, true); // true to keep master control of bus
 	//i2c_write_blocking(SSD1306_I2C_PORT, SSD1306_I2C_ADDR, buffer, buff_size, false);
 }

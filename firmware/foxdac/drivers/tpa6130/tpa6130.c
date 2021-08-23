@@ -67,7 +67,7 @@ static const char* tpa_vol_to_str[TPA6130_VOL_CNT] = {
 };
 
 void tpa6130_init_i2c(void) {
-    i2c_init(TPA_I2C_PORT, 100 * 1000);
+    i2c_init(TPA_I2C_PORT, 400 * 1000);
     gpio_set_function(TPA_I2C_SDA, GPIO_FUNC_I2C);
     gpio_set_function(TPA_I2C_SCL, GPIO_FUNC_I2C);
     gpio_pull_up(TPA_I2C_SDA);
@@ -76,14 +76,14 @@ void tpa6130_init_i2c(void) {
 
 static void write_reg(uint8_t reg, uint8_t data) {
     uint8_t buf[2] = { reg,  data };
-    i2c_write_blocking_until(TPA_I2C_PORT, TPA_I2C_ADDR, buf, 2, false, make_timeout_time_ms(100));
+    i2c_write_blocking_until(TPA_I2C_PORT, TPA_I2C_ADDR, buf, 2, false, make_timeout_time_ms(10));
 }
 
 static uint8_t read_reg(uint8_t reg) {
     uint8_t buf = 0;
 
-    i2c_write_blocking_until(TPA_I2C_PORT, TPA_I2C_ADDR, &reg, 1, true, make_timeout_time_ms(100));
-    i2c_read_blocking_until(TPA_I2C_PORT, TPA_I2C_ADDR, &buf, 1, false, make_timeout_time_ms(100));
+    i2c_write_blocking_until(TPA_I2C_PORT, TPA_I2C_ADDR, &reg, 1, true, make_timeout_time_ms(10));
+    i2c_read_blocking_until(TPA_I2C_PORT, TPA_I2C_ADDR, &buf, 1, false, make_timeout_time_ms(10));
 
     return buf;
 }
