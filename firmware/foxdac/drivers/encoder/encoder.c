@@ -208,7 +208,6 @@ void encoder_init(void) {
 
 	irq_set_exclusive_handler(PIO1_IRQ_0, pio1_interrupt_callback);
 	irq_set_enabled(PIO1_IRQ_0, true);
-	irq_set_priority(PIO1_IRQ_0, PICO_DEFAULT_IRQ_PRIORITY + 2);
 
 	//Read the current state of the encoder pins and start the PIO program on the SM
 	stateA = gpio_get(pinA);

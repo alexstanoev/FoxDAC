@@ -276,6 +276,7 @@ static volatile uint8_t sof_dma_buf_pos = 0, sof_dma_buf_filled = 0;
 static volatile uint32_t rate = 48000;
 
 void __not_in_flash_func(usb_sof_irq)(void) {
+    return;
     // handle feedback sample rate calculations @ SOF to sync up with USB clock
     uint32_t new_samples = pio_samples_dma - pio_prev_samples_dma;
     pio_prev_samples_dma = pio_samples_dma;
@@ -695,7 +696,6 @@ static void core1_worker() {
 
     // Start up the SPDIF PIO (core 1)
     //audio_spdif_set_enabled(true);
-    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
 
     while(1) {
         if(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) {
@@ -725,8 +725,8 @@ void core0_init() {
     gpio_init(18);
     gpio_set_dir(18, GPIO_OUT);
 
-    // Grant high bus priority to the DMA and core 0 (running all audio interrupts)
-    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS | BUSCTRL_BUS_PRIORITY_PROC0_BITS;
+    // Grant high bus priority to the DMA
+    bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
 
     producer_pool = audio_new_producer_pool(&producer_format, AUDIO_BUFFER_COUNT, 96);
 
@@ -736,11 +736,11 @@ void core0_init() {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    bool __unused ok = audio_spdif_connect_extra(producer_pool, false, AUDIO_BUFFER_COUNT / 2, NULL);
+    bool __unused ok = audio_spdif_connect_extra(producer_pool, false, AUDIO_BUFFER_COUNT / 4, NULL);
     assert(ok);
 
     usb_sound_card_init();
-    //irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 1);
+    //irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY);
 
     // Init the WM8805 SPDIF receiver
     wm8805_init();
@@ -750,7 +750,7 @@ void core0_init() {
 
     // Start up the SPDIF PIO (core 0)
     audio_spdif_set_enabled(true);
-    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_DEFAULT_IRQ_PRIORITY - 2);
+    irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_HIGHEST_IRQ_PRIORITY);
 }
 
 int main(void) {

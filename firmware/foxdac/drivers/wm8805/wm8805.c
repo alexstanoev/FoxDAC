@@ -112,10 +112,15 @@ static void init_device(void) {
 
     // set PLL K and N factors
     // this should be sample rate dependent, but makes hardly any difference
-    write_reg(6, 7);                  // set PLL_N to 7
+    write_reg(6, 7);                    // set PLL_N to 7
     write_reg(5, 0x36);                 // set PLL_K to 36FD21 (36)
     write_reg(4, 0xFD);                 // set PLL_K to 36FD21 (FD)
     write_reg(3, 0x21);                 // set PLL_K to 36FD21 (21)
+
+//    write_reg(6, 8);                    // set PLL_N to 8
+//    write_reg(5, 0x0C);                 // set PLL_K to 0C49BA
+//    write_reg(4, 0x49);                 // set PLL_K to 0C49BA
+//    write_reg(3, 0xBA);                 // set PLL_K to 0C49BA
 
     // set all inputs for TTL
     write_reg(9, 0);

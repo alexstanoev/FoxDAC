@@ -152,7 +152,7 @@ void ui_init(void) {
     spectrum_init();
 }
 
-void __not_in_flash_func(ui_loop)(void) {
+void ui_loop(void) {
     if(do_wm_tick) {
         do_wm_tick = 0;
         wm8805_poll_intstat();
