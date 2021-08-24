@@ -1,10 +1,12 @@
 if (TARGET usb_device)
     PROJECT(foxdac)
 
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+    set(CMAKE_CXX_FLAGS_RELEASE "-Os")
 
     add_executable(foxdac usb_spdif.c)
-            
+
+    pico_set_binary_type(foxdac copy_to_ram)
+
     add_subdirectory(drivers)
     add_subdirectory(ui)
 
@@ -18,7 +20,6 @@ if (TARGET usb_device)
             PICO_USBDEV_MAX_DESCRIPTOR_SIZE=256
 
             PICO_USBDEV_ISOCHRONOUS_BUFFER_STRIDE_TYPE=2
-            PICO_USBDEV_ENABLE_DEBUG_TRACE
 
             PICO_AUDIO_SPDIF_PIN=9
             PICO_AUDIO_SPDIF_DMA_IRQ=1

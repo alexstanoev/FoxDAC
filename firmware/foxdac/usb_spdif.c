@@ -260,7 +260,7 @@ static struct {
         .freq = 44100,
 };
 
-#define AUDIO_BUFFER_COUNT 32
+#define AUDIO_BUFFER_COUNT 8
 
 static struct audio_buffer_pool *producer_pool;
 
@@ -695,6 +695,7 @@ static void core1_worker() {
     ui_init();
 
     // Start up the SPDIF PIO (core 1)
+    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_HIGHEST_IRQ_PRIORITY);
     //audio_spdif_set_enabled(true);
 
     while(1) {
@@ -707,7 +708,7 @@ static void core1_worker() {
 
         ui_loop();
 
-        __wfi();
+        __wfe();
     }
 }
 
@@ -728,7 +729,7 @@ void core0_init() {
     // Grant high bus priority to the DMA
     bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
 
-    producer_pool = audio_new_producer_pool(&producer_format, AUDIO_BUFFER_COUNT, 96);
+    producer_pool = audio_new_producer_pool(&producer_format, AUDIO_BUFFER_COUNT, 192);
 
     const struct audio_format *output_format;
     output_format = audio_spdif_setup(&audio_format_48k, &config);
@@ -736,11 +737,11 @@ void core0_init() {
         panic("PicoAudio: Unable to open audio device.\n");
     }
 
-    bool __unused ok = audio_spdif_connect_extra(producer_pool, false, AUDIO_BUFFER_COUNT / 4, NULL);
+    bool __unused ok = audio_spdif_connect_extra(producer_pool, false, AUDIO_BUFFER_COUNT / 2, NULL);
     assert(ok);
 
+    //irq_set_priority(USBCTRL_IRQ, 0x40);
     usb_sound_card_init();
-    //irq_set_priority(USBCTRL_IRQ, PICO_DEFAULT_IRQ_PRIORITY);
 
     // Init the WM8805 SPDIF receiver
     wm8805_init();
@@ -749,8 +750,8 @@ void core0_init() {
     tpa6130_init();
 
     // Start up the SPDIF PIO (core 0)
-    audio_spdif_set_enabled(true);
     irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_HIGHEST_IRQ_PRIORITY);
+    audio_spdif_set_enabled(true);
 }
 
 int main(void) {
@@ -759,7 +760,7 @@ int main(void) {
     // 17.2032*10=172.032MHz is not exactly doable by the PLL but 172.0MHz is
     // if we just ignore 44.1 instead, 192000 is a nice integer multiple for 48 and 96
     // ideally the core would run at 96MHz to avoid running overclocked, but this seems to be fine
-    set_sys_clock_khz(192000, true);
+    set_sys_clock_khz(96000, true);
 
     // Debug UART
     stdout_uart_init();
@@ -771,6 +772,6 @@ int main(void) {
     multicore_launch_core1(core1_worker);
 
     while (1) {
-        __wfi();
+        __wfe();
     }
 }

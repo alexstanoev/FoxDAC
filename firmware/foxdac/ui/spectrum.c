@@ -41,7 +41,7 @@ volatile int fft_in_pos = 0;
 
 volatile kiss_fft_cpx fft_out[NSAMP];
 
-#define FFT_MEM_LEN_BYTES 10240
+#define FFT_MEM_LEN_BYTES 8192
 uint8_t fft_mem[FFT_MEM_LEN_BYTES];
 size_t fft_mem_len = FFT_MEM_LEN_BYTES;
 
