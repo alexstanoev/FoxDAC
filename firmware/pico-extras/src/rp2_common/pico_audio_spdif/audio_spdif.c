@@ -157,6 +157,7 @@ const audio_format_t *audio_spdif_setup(const audio_format_t *intended_audio_for
     channel_config_set_dreq(&dma_config,
                             DREQ_PIOx_TX0 + sm
     );
+
     dma_channel_configure(dma_channel,
                           &dma_config,
                           &audio_pio->txf[sm],  // dest
@@ -165,7 +166,8 @@ const audio_format_t *audio_spdif_setup(const audio_format_t *intended_audio_for
                           false // trigger
     );
 
-    irq_add_shared_handler(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, audio_spdif_dma_irq_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
+    irq_set_exclusive_handler(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, audio_spdif_dma_irq_handler);
+    //irq_add_shared_handler(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, audio_spdif_dma_irq_handler, PICO_SHARED_IRQ_HANDLER_DEFAULT_ORDER_PRIORITY);
     dma_irqn_set_channel_enabled(PICO_AUDIO_SPDIF_DMA_IRQ, dma_channel, 1);
     return intended_audio_format;
 }
@@ -177,7 +179,11 @@ static void update_pio_frequency(uint32_t sample_freq) {
     uint32_t system_clock_frequency = clock_get_hz(clk_sys);
     assert(system_clock_frequency < 0x40000000);
     // coincidentally * 256 (for 8 bit fraction) / 2 (channels) * 32 (bits) * 2 (time periods) * 2 cycles per time period)
-    uint32_t divider = system_clock_frequency / sample_freq;
+    //uint32_t divider = system_clock_frequency / sample_freq;
+
+    // ceil the divider instead (gets us a closer hit to 44100 at 176.57142857142858 MHz: 44098.7583844)
+    uint32_t divider = system_clock_frequency / sample_freq + (system_clock_frequency % sample_freq != 0);
+
     printf("System clock at %u, S/PDIF clock divider 0x%x/256\n", (uint) system_clock_frequency, (uint)divider);
     assert(divider < 0x1000000);
     pio_sm_set_clkdiv_int_frac(audio_pio, shared_state.pio_sm, divider >> 8u, divider & 0xffu);

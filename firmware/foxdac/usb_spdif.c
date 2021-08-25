@@ -260,6 +260,8 @@ static struct {
         .freq = 44100,
 };
 
+static volatile uint8_t clock_176mhz = 0;
+
 #define AUDIO_BUFFER_COUNT 8
 
 static struct audio_buffer_pool *producer_pool;
@@ -496,8 +498,22 @@ static void _audio_reconfigure() {
     default:
         audio_state.freq = 44100;
     }
+
+    // if we're going to 48/96 from 44.1, clock up the system PLL
+    if((audio_state.freq == 48000 || audio_state.freq == 96000) && clock_176mhz) {
+        // 192.0MHz
+        set_sys_clock_pll(1536000000, 4, 2);
+        clock_176mhz = 0;
+    } else if(audio_state.freq == 44100 && !clock_176mhz) {
+        // 176.57142857142858 MHz, closest PLL frequency near 176.4 MHz (multiple of 44.1)
+        // results in a PIO frequency of 44098.7582418 when rounding up in update_pio_frequency
+        set_sys_clock_pll(1236000000, 7, 1);
+        clock_176mhz = 1;
+    }
+
     // todo hack overwriting const
     ((struct audio_format *) producer_pool->format)->sample_freq = audio_state.freq;
+
     rate = audio_state.freq;
     sof_dma_buf_filled = 0;
     sof_dma_buf_pos = 0;
@@ -760,7 +776,10 @@ int main(void) {
     // 17.2032*10=172.032MHz is not exactly doable by the PLL but 172.0MHz is
     // if we just ignore 44.1 instead, 192000 is a nice integer multiple for 48 and 96
     // ideally the core would run at 96MHz to avoid running overclocked, but this seems to be fine
-    set_sys_clock_khz(96000, true);
+    //set_sys_clock_khz(192000, true);
+
+    // 192.0MHz
+    set_sys_clock_pll(1536000000, 4, 2);
 
     // Debug UART
     stdout_uart_init();
