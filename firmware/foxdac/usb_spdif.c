@@ -333,7 +333,7 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     //    out[i] = (int16_t) ((in[i] * vol_mul) >> 15u);
     //}
 
-    spectrum_consume_samples(out, audio_buffer->sample_count);
+    spectrum_consume_samples(out, audio_buffer->sample_count, audio_state.freq);
 
     give_audio_buffer(producer_pool, audio_buffer);
 
@@ -715,12 +715,20 @@ static void core1_worker() {
     //audio_spdif_set_enabled(true);
 
     while(1) {
-        if(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) {
-            // we're suspended, TODO turn off the OLED
-            ui_set_sr_text("SUSPEND");
-        } else {
-            // not suspended, wake up
-        }
+        // suspend if we had inited usb once (otherwise can't distinguish between 5V only)
+        // only do that if the USB input is selected?
+//        if(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS && usb_host_seen && !suspended) {
+//
+//            ssd1306_SetDisplayOn(0);
+//            // we're suspended, TODO turn off the OLED
+//            //ui_set_sr_text("SUSPEND");
+//
+//            // turn off underrun led
+//            gpio_put(18, 0);
+//        } else if(usb_host_seen && suspended){
+//            // waking up
+//            ssd1306_SetDisplayOn(0);
+//        }
 
         ui_loop();
 
