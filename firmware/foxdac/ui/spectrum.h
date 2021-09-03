@@ -12,7 +12,7 @@
 #include "stdint.h"
 
 void spectrum_loop(void);
-void spectrum_consume_samples(int16_t* samples, uint32_t sample_count, uint32_t sample_rate);
+void spectrum_consume_samples(int16_t* samples, uint32_t sample_count, uint32_t rate);
 void spectrum_init(void);
 void spectrum_start(void);
 void spectrum_stop(void);

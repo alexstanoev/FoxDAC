@@ -9,6 +9,7 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include "../../ui/dac_lvgl_ui.h"
 
 #define PIN_MISO 4
 #define PIN_CS   5
@@ -65,6 +66,9 @@ static void write_reg(uint8_t regaddr, uint8_t dataval) {
     spi_write_blocking(SPI_PORT, &dataval, 1);
     cs_deselect();
 }
+
+// TODO read intstat from interrupt on GPO0
+// TODO set GPO1 to SFRM_CLK?
 
 static void init_device(void) {
     // reset device
@@ -160,6 +164,7 @@ static uint8_t fs = 0;
 static char* sr_str = "N/A";
 
 static const char* get_samplerate_str(void) {
+    // sample rate from channel status (not reliable)
     uint8_t samplerate = read_reg(16);
 
     switch(samplerate) {
@@ -222,12 +227,13 @@ void wm8805_poll_intstat(void) {
     if (bitRead(INTSTAT, 0)) {                                         // UPD_UNLOCK
         SPDSTAT = read_reg(12);
         puts("UPD_UNLOCK: ");
+
         if (bitRead(SPDSTAT,6)) {
             //delay(500);
 
             // try again to try to reject transient errors
-            SPDSTAT = read_reg(12);
-            if (bitRead(SPDSTAT,6)) {
+            //SPDSTAT = read_reg(12);
+            //if (bitRead(SPDSTAT,6)) {
 
                 puts("S/PDIF PLL unlocked");
 
@@ -258,7 +264,7 @@ void wm8805_poll_intstat(void) {
 //                } // if toggle
 
 
-            } // if (bitRead(SPDSTAT,6))
+            //} // if (bitRead(SPDSTAT,6))
 
         }
         else {
@@ -270,6 +276,7 @@ void wm8805_poll_intstat(void) {
             //Serial.print("UPD_REC_FREQ: ");
             puts("Sample rate: ");
 
+            // TODO if USB is the input, take the usb samplerate
             switch (samplerate) {
             case 3:
                 puts("32 kHz");

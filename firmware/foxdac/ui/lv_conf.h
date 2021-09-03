@@ -390,7 +390,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 
 #define LV_USE_LABEL        1
 #if LV_USE_LABEL
-#  define LV_LABEL_TEXT_SELECTION         1   /*Enable selecting text of the label*/
+#  define LV_LABEL_TEXT_SELECTION         0   /*Enable selecting text of the label*/
 #  define LV_LABEL_LONG_TXT_HINT    1   /*Store some extra info in labels to speed up drawing of very long texts*/
 #endif
 
@@ -403,7 +403,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
 
 #define LV_USE_SLIDER       1   /*Requires: lv_bar*/
 
-#define LV_USE_SWITCH    1
+#define LV_USE_SWITCH    0
 
 #define LV_USE_TEXTAREA   0    /*Requires: lv_label*/
 #if LV_USE_TEXTAREA != 0

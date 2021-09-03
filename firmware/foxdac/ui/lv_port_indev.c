@@ -42,6 +42,8 @@ lv_indev_t * indev_button;
 static int32_t encoder_diff;
 static lv_indev_state_t encoder_state;
 
+uint8_t lv_indev_pause_encoder = 0;
+
 /**********************
  *      MACROS
  **********************/
@@ -114,7 +116,7 @@ void lv_port_indev_init(void)
 /*Will be called by the library to read the encoder*/
 static void encoder_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
-    data->enc_diff = encoder_get_delta();
+    data->enc_diff = lv_indev_pause_encoder ? 0 : encoder_get_delta();
 
     // if encoder pressed LV_INDEV_STATE_PR else LV_INDEV_STATE_REL
     data->state = LV_INDEV_STATE_REL;

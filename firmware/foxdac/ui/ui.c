@@ -25,6 +25,8 @@
 #define BTN_MENU 26
 #define BTN_OK   27
 
+#define INPUT_COUNT 4
+
 static void lv_init_ui(void) {
     lv_init();
     lv_port_disp_init();
@@ -43,10 +45,7 @@ static void buttons_init(void) {
     gpio_pull_up(BTN_OK);
 }
 
-static uint8_t btn_ok_lpf = 0, btn_menu_lpf = 0, btn_ok_press = 0, btn_menu_press = 0;
-
-#define INPUT_COUNT 4
-#define SCREEN_COUNT 3
+static uint8_t btn_ok_press = 0, btn_menu_press = 0;
 
 static uint8_t cur_input = 0, cur_screen = 0;
 static uint8_t input_to_wm[INPUT_COUNT] = { 3, 0, 1, 2 };
@@ -56,8 +55,6 @@ static uint8_t do_wm_tick = 0, do_lvgl_tick = 0;
 alarm_pool_t* core1_alarm_pool;
 
 static void buttons_read(void) {
-    //btn_menu_lpf = (btn_menu_lpf * 9 + (!gpio_get(BTN_MENU)) * 10) / 10;
-    //btn_ok_lpf = (btn_ok_lpf * 9 + (!gpio_get(BTN_OK)) * 10) / 10;
 
     if (!gpio_get(BTN_MENU)) {
 
@@ -84,9 +81,18 @@ static void buttons_read(void) {
                 break;
             case 2:
 
-                // apple to main
+                // apple to breakout
 
                 badapple_stop();
+                breakout_start();
+
+                cur_screen = 3;
+                break;
+            case 3:
+
+                // breakout to main
+
+                breakout_stop();
 
                 //lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_MOVE_LEFT, 100, 100, false);
 
@@ -102,8 +108,7 @@ static void buttons_read(void) {
         btn_menu_press = 0;
     }
 
-    if (!gpio_get(BTN_OK)) { //(btn_ok_lpf > 5) {
-        //printf("%u\n", btn_ok_lpf);
+    if (!gpio_get(BTN_OK)) {
 
         if(!btn_ok_press) {
             // ok pressed - toggle inputs
@@ -112,9 +117,6 @@ static void buttons_read(void) {
             ui_select_input(cur_input);
 
             wm8805_set_input(input_to_wm[cur_input]);
-
-            //printf("press\n");
-
         }
 
         btn_ok_press = 1;
@@ -150,6 +152,7 @@ void ui_init(void) {
     alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 100, wm_timer_cb, NULL, &wm_timer);
 
     spectrum_init();
+    breakout_init();
 }
 
 void ui_loop(void) {

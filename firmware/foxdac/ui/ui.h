@@ -16,4 +16,8 @@ void badapple_start(void);
 void badapple_stop(void);
 void badapple_next_frame(void);
 
+void breakout_init(void);
+void breakout_start(void);
+void breakout_stop(void);
+
 #endif /* FOXDAC_UI_H_ */

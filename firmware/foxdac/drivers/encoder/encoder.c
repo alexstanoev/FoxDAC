@@ -13,6 +13,9 @@
 #include "encoder.h"
 #include "encoder.pio.h"
 
+// new encoder source is backwards and twice the steps
+#define NEW_ENCODER 0
+
 #define LAST_STATE(state)  ((state) & 0b0011)
 #define CURR_STATE(state)  (((state) & 0b1100) >> 2)
 
@@ -44,7 +47,7 @@ const int pinA = 19;
 const int pinB = 20;
 
 const float counts_per_revolution   = DEFAULT_COUNTS_PER_REV;
-const bool count_microsteps         = DEFAULT_COUNT_MICROSTEPS;
+volatile bool count_microsteps         = DEFAULT_COUNT_MICROSTEPS;
 const uint16_t freq_divider         = DEFAULT_FREQ_DIVIDER;
 const float clocks_per_time         = 0;
 
@@ -216,8 +219,14 @@ void encoder_init(void) {
 }
 
 int32_t encoder_get_delta(void) {
+    irq_set_enabled(PIO1_IRQ_0, false);
     int32_t delta = count - last_captured_count;
     last_captured_count = count;
+    irq_set_enabled(PIO1_IRQ_0, true);
 
+#if NEW_ENCODER
+    return delta;
+#else
     return delta * -1;
+#endif
 }
