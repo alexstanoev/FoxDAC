@@ -15,8 +15,10 @@
 
 #include "kissfft/kiss_fftr.h"
 
-#define FFT_SIZE 1024
-#define FFT_SIZE_F (1024.0f)
+#include <arm_math.h>
+
+#define FFT_SIZE 128
+#define FFT_SIZE_F (128.0f)
 
 #define NUM_BARS 41
 #define NUM_BARS_F 41.0f
@@ -52,6 +54,11 @@ static lv_coord_t old_value_array[NUM_BARS];
 static lv_timer_t * spectrum_timer;
 
 lv_obj_t * Spectrum;
+
+
+static arm_rfft_instance_q15 fft_instance;
+static q15_t fft_output[FFT_SIZE * 2];
+
 
 static float mapRange(float a1, float a2, float b1, float b2, float s) {
     return b1 + (s - a1) * (b2 - b1) / (a2 - a1);
@@ -96,6 +103,9 @@ void spectrum_loop(void) {
     for (int i = 0; i < sample_buf_pos; i ++) {
         fft_in[i] = hanningWindow((float) sample_buf[i], i, FFT_SIZE);
     }
+
+    //arm_rfft_q15(&fft_instance,(q15_t *) fft_in, fft_output);
+    //arm_abs_q15(fft_output, fft_output, FFT_SIZE);
 
     // compute FFT
     kiss_fftr(fft_cfg, fft_in, fft_out);
@@ -159,6 +169,9 @@ static void redraw_bars(lv_timer_t * timer) {
 
 void spectrum_init(void) {
     fft_cfg = kiss_fftr_alloc(FFT_SIZE, false, fft_mem, &fft_mem_len);
+
+    arm_status status = arm_rfft_init_q15(&fft_instance, FFT_SIZE, 0, 1);
+    printf("fft status %d\n", status);
 
     Spectrum = lv_obj_create(NULL);
 

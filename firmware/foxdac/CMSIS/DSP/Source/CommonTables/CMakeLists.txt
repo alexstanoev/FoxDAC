@@ -10,6 +10,13 @@ add_library(CMSISDSPCommon STATIC arm_common_tables.c arm_common_tables_f16.c)
 configLib(CMSISDSPCommon ${ROOT})
 configDsp(CMSISDSPCommon ${ROOT})
 
+# Table configuration doesn't apply from config for some reason
+target_compile_definitions(CMSISDSPCommon PUBLIC ARM_DSP_CONFIG_TABLES)
+target_compile_definitions(CMSISDSPCommon PUBLIC ARM_FFT_ALLOW_TABLES)
+target_compile_definitions(CMSISDSPCommon PUBLIC ARM_TABLE_REALCOEF_Q15)
+target_compile_definitions(CMSISDSPCommon PUBLIC ARM_TABLE_TWIDDLECOEF_Q15_64)
+target_compile_definitions(CMSISDSPCommon PUBLIC ARM_TABLE_BITREVIDX_FXT_64)
+
 if (CONFIGTABLE AND ALLFFT)
     target_compile_definitions(CMSISDSPCommon PUBLIC ARM_ALL_FFT_TABLES) 
 endif()

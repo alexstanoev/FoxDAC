@@ -195,5 +195,5 @@ endif()
 ### Includes
 target_include_directories(CMSISDSPTransform PUBLIC "${DSP}/Include")
 
-
+target_link_libraries(CMSISDSPTransform PRIVATE CMSISDSPCommon CMSISDSPBasicMath)
 
