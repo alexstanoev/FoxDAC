@@ -7,6 +7,7 @@
 
 #include "pico/stdlib.h"
 #include "hardware/i2c.h"
+#include <stdio.h>
 
 #define TPA_I2C_PORT i2c0
 #define TPA_I2C_SDA 12

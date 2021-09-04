@@ -198,7 +198,7 @@ static void update_ball(void) {
     }
 
     // collision with paddle
-    if (x >= paddle.x - 1 && x <= paddle.x + PADDLE_W + 1 && ceil(y) > paddle.y - 1 && ceil(y) < paddle.y + PADDLE_H + 1) {
+    if (x >= paddle.x - 1 && x <= paddle.x + PADDLE_W + 1 && ceilf(y) > paddle.y - 1 && ceilf(y) < paddle.y + PADDLE_H + 1) {
         float rel = (x - paddle.x + 1) / (PADDLE_W + 1);
         float angle = -1 * M_PI * (1 + 4 * rel) / 6;
 
