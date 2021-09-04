@@ -7,6 +7,7 @@ if (TARGET usb_device)
 
     pico_set_binary_type(foxdac copy_to_ram)
 
+    add_subdirectory(CMSIS)
     add_subdirectory(drivers)
     add_subdirectory(ui)
 
