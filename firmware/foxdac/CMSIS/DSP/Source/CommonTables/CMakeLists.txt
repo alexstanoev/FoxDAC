@@ -16,6 +16,7 @@ target_compile_definitions(CMSISDSPCommon PUBLIC ARM_FFT_ALLOW_TABLES)
 target_compile_definitions(CMSISDSPCommon PUBLIC ARM_TABLE_REALCOEF_Q15)
 target_compile_definitions(CMSISDSPCommon PUBLIC ARM_TABLE_TWIDDLECOEF_Q15_64)
 target_compile_definitions(CMSISDSPCommon PUBLIC ARM_TABLE_BITREVIDX_FXT_64)
+target_compile_definitions(CMSISDSPCommon PUBLIC ARM_MATH_LOOPUNROLL)
 
 if (CONFIGTABLE AND ALLFFT)
     target_compile_definitions(CMSISDSPCommon PUBLIC ARM_ALL_FFT_TABLES) 

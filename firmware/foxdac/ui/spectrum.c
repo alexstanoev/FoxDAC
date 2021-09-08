@@ -17,6 +17,8 @@
 
 #include <arm_math.h>
 
+#define ARM_FFT_SIZE 128
+
 #define FFT_SIZE 128
 #define FFT_SIZE_F (128.0f)
 
@@ -32,18 +34,18 @@ static uint8_t spectrum_running = 0;
 static uint32_t sample_rate = 48000;
 
 static int interp_step = 0;
-static const int interp_times = 3;
+static const int interp_times = 2;
 
-static uint16_t sample_buf[FFT_SIZE];
+static int16_t sample_buf[FFT_SIZE];
 static volatile int sample_buf_pos = 0;
 
 static kiss_fftr_cfg fft_cfg;
-static kiss_fft_scalar fft_in[FFT_SIZE];
+static q15_t fft_in[ARM_FFT_SIZE];
 static kiss_fft_cpx fft_out[FFT_SIZE];
 
-#define FFT_MEM_LEN_BYTES 16384
-static uint8_t fft_mem[FFT_MEM_LEN_BYTES];
-static size_t fft_mem_len = FFT_MEM_LEN_BYTES;
+//#define FFT_MEM_LEN_BYTES 16384
+//static uint8_t fft_mem[FFT_MEM_LEN_BYTES];
+//static size_t fft_mem_len = FFT_MEM_LEN_BYTES;
 
 static lv_obj_t * chart;
 static lv_coord_t value_array[NUM_BARS];
@@ -57,7 +59,7 @@ lv_obj_t * Spectrum;
 
 
 static arm_rfft_instance_q15 fft_instance;
-static q15_t fft_output[FFT_SIZE * 2];
+static q15_t fft_output[ARM_FFT_SIZE * 2];
 
 
 static float mapRange(float a1, float a2, float b1, float b2, float s) {
@@ -104,42 +106,57 @@ void spectrum_loop(void) {
         fft_in[i] = hanningWindow((float) sample_buf[i], i, FFT_SIZE);
     }
 
-    //arm_rfft_q15(&fft_instance,(q15_t *) fft_in, fft_output);
-    //arm_abs_q15(fft_output, fft_output, FFT_SIZE);
+    arm_rfft_q15(&fft_instance,(q15_t *) fft_in, fft_output);
+    arm_abs_q15(fft_output, fft_output, ARM_FFT_SIZE);
+
+    // results come back in
+
+//    printf("\nFFT: ");
+//    for(uint8_t i = 0; i < ARM_FFT_SIZE; i++) {
+//        printf("%d ", fft_output[i]);
+//    }
+//    printf("\n");
 
     // compute FFT
-    kiss_fftr(fft_cfg, fft_in, fft_out);
+    //kiss_fftr(fft_cfg, fft_in, fft_out);
 
     for (int i = 0; i < NUM_BARS; i++) {
         // log scale, bins spaced at:
         // min * (max/min) ^ x
-        float bar_freq = MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), i / NUM_BARS_F);
-        float bar_freq_next = ((i + 1) == NUM_BARS) ? MAX_BAR_FREQ : (MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), (i + 1) / NUM_BARS_F));
-
-        int startbin = floorf(bar_freq / FFT_BIN_SIZE);
-        int endbin = ceilf(bar_freq_next / FFT_BIN_SIZE);
-
-        //printf("%d %f %f %d %d\n", i, bar_freq, bar_freq_next, startbin, endbin);
-
-        // resolution at the first bars is too low, just draw some bins directly
-        if(startbin == 1 && endbin == 2) {
-            startbin = i;
-            endbin = i + 1;
-        }
-
-        // rebin
-        float power_sum = 0;
-        for(int j = startbin; j < endbin; j++) {
-            power_sum += sqrtf(fft_out[j].r * fft_out[j].r + fft_out[j].i * fft_out[j].i) / FFT_SIZE_F;
-        }
-
-        power_sum = 20 * log10f(power_sum / (endbin - startbin));
+//        float bar_freq = MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), i / NUM_BARS_F);
+//        float bar_freq_next = ((i + 1) == NUM_BARS) ? MAX_BAR_FREQ : (MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), (i + 1) / NUM_BARS_F));
+//
+//        int startbin = floorf(bar_freq / FFT_BIN_SIZE);
+//        int endbin = ceilf(bar_freq_next / FFT_BIN_SIZE);
+//
+//        //printf("%d %f %f %d %d\n", i, bar_freq, bar_freq_next, startbin, endbin);
+//
+//        // resolution at the first bars is too low, just draw some bins directly
+//        if(startbin == 1 && endbin == 2) {
+//            startbin = i;
+//            endbin = i + 1;
+//        }
+//
+//        // rebin
+//        float power_sum = 0;
+//        for(int j = startbin; j < endbin; j++) {
+//            power_sum += sqrtf(fft_out[j].r * fft_out[j].r + fft_out[j].i * fft_out[j].i) / FFT_SIZE_F;
+//        }
+//
+//        power_sum = 20 * log10f(power_sum / (endbin - startbin));
 
         //float power = 20 * log10f(sqrtf(fft_out[i].r * fft_out[i].r + fft_out[i].i * fft_out[i].i) / FFT_SIZE_F);
 
         // 96dB dynamic range with 16 bits + fudge window loss
         old_value_array[i] = target_value_array[i];
-        target_value_array[i] = mapRange(0, 90, 0, 64, power_sum);
+        //target_value_array[i] = mapRange(0, 90, 0, 64, power_sum);
+
+        float power = 20 * log10f(fft_output[i+2]);
+        power -= 40.0f;
+        if(power < 0) power = 0.0f;
+        if(power > 64) power = 64.0f;
+
+        target_value_array[i] = power;
     }
 
     interp_step = 0;
@@ -168,10 +185,12 @@ static void redraw_bars(lv_timer_t * timer) {
 }
 
 void spectrum_init(void) {
-    fft_cfg = kiss_fftr_alloc(FFT_SIZE, false, fft_mem, &fft_mem_len);
+    //fft_cfg = kiss_fftr_alloc(FFT_SIZE, false, fft_mem, &fft_mem_len);
 
-    arm_status status = arm_rfft_init_q15(&fft_instance, FFT_SIZE, 0, 1);
-    printf("fft status %d\n", status);
+    arm_status status = arm_rfft_init_q15(&fft_instance, ARM_FFT_SIZE, 0, 1);
+    if(status != ARM_MATH_SUCCESS) {
+        printf("FFT init failed: %d\n", status);
+    }
 
     Spectrum = lv_obj_create(NULL);
 
