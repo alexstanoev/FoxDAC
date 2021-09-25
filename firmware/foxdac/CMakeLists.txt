@@ -1,7 +1,8 @@
 if (TARGET usb_device)
     PROJECT(foxdac)
 
-    set(CMAKE_CXX_FLAGS_RELEASE "-Os")
+    add_compile_options(-fcommon)
+    add_compile_options(-Os)
 
     add_executable(foxdac usb_spdif.c)
 
