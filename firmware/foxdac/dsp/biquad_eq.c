@@ -101,11 +101,11 @@ static q31_t biquadStateBand3Q31[4 * 2];
 static q31_t biquadStateBand4Q31[4 * 2];
 static q31_t biquadStateBand5Q31[4 * 2];
 
-static arm_biquad_cas_df1_32x64_ins_q31 S1;
-static arm_biquad_cas_df1_32x64_ins_q31 S2;
-static arm_biquad_casd_df1_inst_q31 S3;
-static arm_biquad_casd_df1_inst_q31 S4;
-static arm_biquad_casd_df1_inst_q31 S5;
+static arm_biquad_cas_df1_32x64_ins_q31 S1[2];
+static arm_biquad_cas_df1_32x64_ins_q31 S2[2];
+static arm_biquad_casd_df1_inst_q31 S3[2];
+static arm_biquad_casd_df1_inst_q31 S4[2];
+static arm_biquad_casd_df1_inst_q31 S5[2];
 
 /* ----------------------------------------------------------------------
  ** Q31 input and output buffers
@@ -233,7 +233,7 @@ const __attribute__((section(".flashdata.dsp"))) q31_t coeffTable[950] = {
  ** Desired gains, in dB, per band
  ** ------------------------------------------------------------------- */
 
-int gainDB[5] = {10, 6, -1, 0, 1};
+int gainDB[5] = {-1, -1, -2, -3, -4};
 
 
 /* ----------------------------------------------------------------------
@@ -247,41 +247,39 @@ void biquad_eq_init(void)
 
     /* Initialize the state and coefficient buffers for all Biquad sections */
 
-    arm_biquad_cas_df1_32x64_init_q31(&S1, NUMSTAGES,
-            (q31_t *) &coeffTable[190*0 + 10*(gainDB[0] + 9)],
-            &biquadStateBand1Q31[0], 2);
+    for(int chan = 0; chan <= 1; chan++) {
+        arm_biquad_cas_df1_32x64_init_q31(&S1[chan], NUMSTAGES,
+                (q31_t *) &coeffTable[190*0 + 10*(gainDB[0] + 9)],
+                &biquadStateBand1Q31[0], 2);
 
-    arm_biquad_cas_df1_32x64_init_q31(&S2, NUMSTAGES,
-            (q31_t *) &coeffTable[190*1 + 10*(gainDB[1] + 9)],
-            &biquadStateBand2Q31[0], 2);
+        arm_biquad_cas_df1_32x64_init_q31(&S2[chan], NUMSTAGES,
+                (q31_t *) &coeffTable[190*1 + 10*(gainDB[1] + 9)],
+                &biquadStateBand2Q31[0], 2);
 
-    arm_biquad_cascade_df1_init_q31(&S3, NUMSTAGES,
-            (q31_t *) &coeffTable[190*2 + 10*(gainDB[2] + 9)],
-            &biquadStateBand3Q31[0], 2);
+        arm_biquad_cascade_df1_init_q31(&S3[chan], NUMSTAGES,
+                (q31_t *) &coeffTable[190*2 + 10*(gainDB[2] + 9)],
+                &biquadStateBand3Q31[0], 2);
 
-    arm_biquad_cascade_df1_init_q31(&S4, NUMSTAGES,
-            (q31_t *) &coeffTable[190*3 + 10*(gainDB[3] + 9)],
-            &biquadStateBand4Q31[0], 2);
+        arm_biquad_cascade_df1_init_q31(&S4[chan], NUMSTAGES,
+                (q31_t *) &coeffTable[190*3 + 10*(gainDB[3] + 9)],
+                &biquadStateBand4Q31[0], 2);
 
-    arm_biquad_cascade_df1_init_q31(&S5, NUMSTAGES,
-            (q31_t *) &coeffTable[190*4 + 10*(gainDB[4] + 9)],
-            &biquadStateBand5Q31[0], 2);
+        arm_biquad_cascade_df1_init_q31(&S5[chan], NUMSTAGES,
+                (q31_t *) &coeffTable[190*4 + 10*(gainDB[4] + 9)],
+                &biquadStateBand5Q31[0], 2);
+    }
 
 }
 
 void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
 
-    int numblocks = (len / 2) / BLOCKSIZE;
+    int numblocks = len / BLOCKSIZE;
 
     /* Call the process functions and needs to change filter coefficients
        for varying the gain of each band */
 
-    for(int chan = 0; chan <= 1; chan++) {
-        for(int i=0; i < numblocks; i ++) {
-
-            /* ----------------------------------------------------------------------
-             ** Convert block of input data from float to Q31
-             ** ------------------------------------------------------------------- */
+    for(int i = 0; i < numblocks; i++) {
+        for(int chan = 0; chan <= 1; chan++) {
 
             int k = 0;
             for(int j = 0; j < BLOCKSIZE * 2; j += 2) {
@@ -295,20 +293,21 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
 
             arm_scale_q31(inputQ31, 0x7FFFFFFF, -3, inputQ31, BLOCKSIZE);
 
-            /* ----------------------------------------------------------------------
-             ** Call the Q31 Biquad Cascade DF1 32x64 process function for band1, band2
-             ** ------------------------------------------------------------------- */
-
-            arm_biquad_cas_df1_32x64_q31(&S1, inputQ31, inputQ31, BLOCKSIZE);
-            arm_biquad_cas_df1_32x64_q31(&S2, inputQ31, inputQ31, BLOCKSIZE);
+//            /* ----------------------------------------------------------------------
+//             ** Call the Q31 Biquad Cascade DF1 32x64 process function for band1, band2
+//             ** ------------------------------------------------------------------- */
+//
+//            arm_biquad_cas_df1_32x64_q31(&S1[chan], inputQ31, inputQ31, BLOCKSIZE);
+//            arm_biquad_cas_df1_32x64_q31(&S2[chan], inputQ31, inputQ31, BLOCKSIZE);
 
             /* ----------------------------------------------------------------------
              ** Call the Q31 Biquad Cascade DF1 process function for band3, band4, band5
              ** ------------------------------------------------------------------- */
+            arm_biquad_cascade_df1_q31(&S3[chan], inputQ31, inputQ31, BLOCKSIZE);
+            arm_biquad_cascade_df1_q31(&S4[chan], inputQ31, inputQ31, BLOCKSIZE);
+            arm_biquad_cascade_df1_q31(&S5[chan], inputQ31, inputQ31, BLOCKSIZE);
 
-            arm_biquad_cascade_df1_q31(&S3, inputQ31, inputQ31, BLOCKSIZE);
-            arm_biquad_cascade_df1_q31(&S4, inputQ31, inputQ31, BLOCKSIZE);
-            arm_biquad_cascade_df1_q31(&S5, inputQ31, inputQ31, BLOCKSIZE);
+            arm_scale_q31(inputQ31, 0x7FFFFFFF, 3, inputQ31, BLOCKSIZE);
 
             /* ----------------------------------------------------------------------
              ** Convert Q31 result back to float
@@ -316,16 +315,8 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
 
             k = 0;
             for(int j = 0; j < BLOCKSIZE * 2; j += 2) {
-                samples[(i*BLOCKSIZE*2) + j + chan] = inputQ31[k++] >> 16;
+                samples[(i*BLOCKSIZE*2) + j + chan] = (int16_t) (inputQ31[k++] >> 16);
             }
-
         }
-        //arm_q31_to_float(outputQ31, outputF32 + (i * BLOCKSIZE), BLOCKSIZE);
-
-        /* ----------------------------------------------------------------------
-         ** Scale back up
-         ** ------------------------------------------------------------------- */
-
-        //arm_scale_f32(outputF32 + (i * BLOCKSIZE), 8.0f, outputF32 + (i * BLOCKSIZE), BLOCKSIZE);
     }
 }
