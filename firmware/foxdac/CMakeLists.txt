@@ -8,6 +8,7 @@ if (TARGET usb_device)
     pico_set_binary_type(foxdac copy_to_ram)
 
     add_subdirectory(CMSIS)
+    add_subdirectory(dsp)
     add_subdirectory(drivers)
     add_subdirectory(ui)
 
@@ -28,6 +29,6 @@ if (TARGET usb_device)
             PICO_DEFAULT_UART_TX_PIN=16
     )
 
-    target_link_libraries(foxdac dac_ui ssd1306_driver wm8805 tpa6130 pico_stdlib usb_device pico_audio_spdif pico_multicore hardware_i2c)
+    target_link_libraries(foxdac dac_ui dac_dsp ssd1306_driver wm8805 tpa6130 pico_stdlib usb_device pico_audio_spdif pico_multicore hardware_i2c)
     pico_add_extra_outputs(foxdac)
 endif()

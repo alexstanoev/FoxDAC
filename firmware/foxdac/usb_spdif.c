@@ -23,6 +23,8 @@
 #include "drivers/wm8805/wm8805.h"
 #include "drivers/tpa6130/tpa6130.h"
 
+#include "dsp/biquad_eq.h"
+
 CU_REGISTER_DEBUG_PINS(audio_timing)
 
 // ---- select at most one ---
@@ -335,6 +337,8 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     //}
 
     spectrum_consume_samples(out, audio_buffer->sample_count, audio_state.freq);
+
+    biquad_eq_process_inplace(out, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
 
@@ -753,6 +757,9 @@ void core0_init() {
 
     // Grant high bus priority to the DMA
     bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
+
+    // Init EQ
+    biquad_eq_init();
 
     producer_pool = audio_new_producer_pool(&producer_format, AUDIO_BUFFER_COUNT, 192);
 
