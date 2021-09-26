@@ -45,6 +45,7 @@ enum Direction {
 
 const int pinA = 19;
 const int pinB = 20;
+const int pinC = 21;
 
 const float counts_per_revolution   = DEFAULT_COUNTS_PER_REV;
 volatile bool count_microsteps         = DEFAULT_COUNT_MICROSTEPS;
@@ -57,6 +58,7 @@ static uint enc_sm         = 0;
 
 static volatile uint8_t stateA                = 0;
 static volatile uint8_t stateB                = 0;
+static volatile uint8_t stateC                = 0;
 static volatile int32_t count              = 0;
 static volatile int32_t time_since         = 0;
 static volatile int8_t last_travel_dir  = NO_DIR;
@@ -216,6 +218,24 @@ void encoder_init(void) {
 	stateA = gpio_get(pinA);
 	stateB = gpio_get(pinB);
 	encoder_program_start(enc_pio, enc_sm, stateA, stateB);
+
+    gpio_init(pinC);
+    gpio_set_dir(pinC, GPIO_IN);
+    gpio_pull_up(pinC);
+}
+
+uint8_t encoder_get_pressed(void) {
+    uint8_t ret;
+
+    if(!gpio_get(pinC)) {
+        ret = !stateC;
+        stateC = 1;
+    } else {
+        ret = 0;
+        stateC = 0;
+    }
+
+    return ret;
 }
 
 int32_t encoder_get_delta(void) {

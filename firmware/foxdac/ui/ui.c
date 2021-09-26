@@ -54,6 +54,8 @@ static uint8_t do_wm_tick = 0, do_lvgl_tick = 0;
 
 alarm_pool_t* core1_alarm_pool;
 
+static uint32_t prev_slider_value;
+
 static void buttons_read(void) {
 
     if (!gpio_get(BTN_MENU)) {
@@ -122,6 +124,20 @@ static void buttons_read(void) {
         btn_ok_press = 1;
     } else {
         btn_ok_press = 0;
+    }
+
+    if(encoder_get_pressed()) {
+        uint32_t new_slider_value;
+
+        if(!tpa6130_get_muted()) {
+            prev_slider_value = (uint32_t)tpa6130_get_volume();
+            new_slider_value = 0;
+        } else {
+            new_slider_value = prev_slider_value;
+        }
+
+        lv_slider_set_value(VolumeSlider, new_slider_value, LV_ANIM_ON);
+        lv_event_send(VolumeSlider, LV_EVENT_VALUE_CHANGED, NULL);
     }
 }
 

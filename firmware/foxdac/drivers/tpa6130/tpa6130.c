@@ -18,6 +18,7 @@
 
 #define TPA6130_VOL_MIN       ((int8_t)(  0)) // -59dB
 #define TPA6130_VOL_MAX       ((int8_t)( 63)) // : +4dB
+#define TPA6130_VOL_DEFAULT   ((int8_t)( 10))
 
 #define TPA6130_CONTROL              0x1
 #define TPA6130_VOLUME_AND_MUTE      0x2
@@ -67,6 +68,10 @@ static const char* tpa_vol_to_str[TPA6130_VOL_CNT] = {
         "+1.7", "+2.1", "+2.5", "+2.9", "+3.3", "+3.6", "+4.0"
 };
 
+static uint8_t new_volume_mute = TPA6130_VOL_MIN;
+static uint8_t volume_pre_mute = TPA6130_VOL_DEFAULT;
+static bool tpa6130_muted = false;
+
 void tpa6130_init_i2c(void) {
     i2c_init(TPA_I2C_PORT, 400 * 1000);
     gpio_set_function(TPA_I2C_SDA, GPIO_FUNC_I2C);
@@ -104,27 +109,6 @@ void tpa6130_powerup(void) {
     write_reg(TPA6130_CONTROL, data & (~SW_SHUTDOWN));
 }
 
-/*! \brief Sets the volume of the amplifier.
- *  Valid values are between 0 (min -59dB) and 63 (max 4dB) although
- *  the function takes care of any values higher than that by setting
- *  it to max.
- *  A volume of 0 will mute both channels. Any other value will unmute
- *  them.
- */
-void tpa6130_set_volume(int8_t volume)
-{
-    int8_t new_volume = volume;
-
-    if(volume > TPA6130_VOL_MAX) {
-        new_volume = TPA6130_VOL_MAX;
-    } else if(volume <= TPA6130_VOL_MIN) {
-        // MUTE Left and Right;
-        new_volume = MUTE_L|MUTE_R;
-    }
-
-    write_reg(TPA6130_VOLUME_AND_MUTE, new_volume);
-}
-
 /*! \brief Gets the current volume settings.
  *  \returns Current volume settings. Value is between 0 (-59dB) and
  *  63 (4dB).
@@ -134,6 +118,44 @@ int8_t tpa6130_get_volume(void)
     return read_reg(TPA6130_VOLUME_AND_MUTE);
 }
 
+/*! \brief Gets the current muted state.
+ *  \returns Current muted state.
+ */
+bool tpa6130_get_muted(void)
+{
+    return tpa6130_muted;
+}
+
+/*! \brief Sets the volume of the amplifier.
+ *  Valid values are between 0 (min -59dB) and 63 (max 4dB) although
+ *  the function takes care of any values higher than that by setting
+ *  it to max.
+ *  A volume of 0 will mute both channels. Any other value will unmute
+ *  them.
+ */
+void tpa6130_set_volume(int8_t volume)
+{
+    // TODO: if moving encoder after pressing mute, restore the volume before the button press
+    // int8_t new_volume = tpa6130_get_muted() ? volume_pre_mute :
+    //                                           volume;
+    int8_t new_volume = volume;
+
+    if(volume > TPA6130_VOL_MAX) {
+        new_volume = TPA6130_VOL_MAX;
+    } else if(volume <= TPA6130_VOL_MIN) {
+        // MUTE Left and Right;
+        new_volume = MUTE_L|MUTE_R;
+        tpa6130_muted = true;
+    } else {
+        volume_pre_mute = new_volume;
+    }
+
+    if(new_volume > TPA6130_VOL_MIN) {
+        tpa6130_muted = false;
+    }
+
+    write_reg(TPA6130_VOLUME_AND_MUTE, new_volume);
+}
 
 void tpa6130_init(void) {
     tpa6130_init_i2c();
@@ -152,7 +174,9 @@ void tpa6130_init(void) {
 
     sleep_ms(50);
 
-    tpa6130_set_volume(10);
+    tpa6130_set_volume(TPA6130_VOL_DEFAULT);
+
+    tpa6130_muted = false;
 
     printf("TPA VOL: %d\n", tpa6130_get_volume());
 }
