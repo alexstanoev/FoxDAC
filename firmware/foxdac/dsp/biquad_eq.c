@@ -8,7 +8,7 @@
 #include "arm_math.h"
 
 // Block size for the underlying processing
-#define BLOCKSIZE 16
+#define BLOCKSIZE 64
 
 #define NUM_EQ_STAGES 10
 
@@ -100,6 +100,7 @@ void biquad_eq_init(void) {
 
 void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
     int numblocks = len / BLOCKSIZE;
+    int leftover = len % BLOCKSIZE;
 
     for(int i = 0; i < numblocks; i++) {
         for(int chan = 0; chan <= 1; chan++) {
@@ -123,6 +124,33 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
             k = 0;
             for(int j = 0; j < BLOCKSIZE * 2; j += 2) {
                 samples[(i * BLOCKSIZE * 2) + j + chan] = (int16_t) (samplesQ31[k++] >> 16);
+            }
+        }
+    }
+
+    // repeat for any non-even multiples of BLOCKSIZE (44.1)
+    if(leftover) {
+        for(int chan = 0; chan <= 1; chan++) {
+            // q16 -> q31
+            int k = 0;
+            for(int j = 0; j < leftover * 2; j += 2) {
+                samplesQ31[k++] = ((q31_t) samples[(numblocks * BLOCKSIZE * 2) + j + chan]) << 16;
+            }
+
+            // Scale down by 1/8 so we don't clip when adding gain
+            arm_scale_q31(samplesQ31, 0x7FFFFFFF, -3, samplesQ31, leftover);
+
+            // Run through all cascades
+            // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
+            // TODO compare with arm_biquad_cas_df1_32x64_q31
+            for(int stage = 0; stage < 4 * 2; stage += 2) {
+                arm_biquad_cascade_df1_q31(&biquad_cascade[stage + chan], samplesQ31, samplesQ31, leftover);
+            }
+
+            // q31 -> q16
+            k = 0;
+            for(int j = 0; j < leftover * 2; j += 2) {
+                samples[(numblocks * BLOCKSIZE * 2) + j + chan] = (int16_t) (samplesQ31[k++] >> 16);
             }
         }
     }
