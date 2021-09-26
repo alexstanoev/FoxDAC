@@ -519,6 +519,8 @@ static void _audio_reconfigure() {
     // todo hack overwriting const
     ((struct audio_format *) producer_pool->format)->sample_freq = audio_state.freq;
 
+    biquad_eq_set_fs(audio_state.freq);
+
     rate = audio_state.freq;
     sof_dma_buf_filled = 0;
     sof_dma_buf_pos = 0;

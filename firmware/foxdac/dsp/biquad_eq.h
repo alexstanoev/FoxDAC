@@ -10,6 +10,8 @@
 
 
 void biquad_eq_init(void);
+void biquad_eq_update_coeffs(void);
+void biquad_eq_set_fs(int fs);
 void biquad_eq_process_inplace(int16_t* samples, int16_t len);
 
 
