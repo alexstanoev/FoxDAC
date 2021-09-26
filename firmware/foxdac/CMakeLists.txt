@@ -2,7 +2,7 @@ if (TARGET usb_device)
     PROJECT(foxdac)
 
     add_compile_options(-fcommon)
-    add_compile_options(-Os)
+    add_compile_options(-O2)
 
     add_executable(foxdac usb_spdif.c)
 
