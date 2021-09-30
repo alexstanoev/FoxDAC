@@ -79,7 +79,7 @@ void biquad_eq_update_coeffs(void) {
     // (re)init cascades
     for(int i = 0; i < NUM_EQ_STAGES * 2; i += 2) {
         for(int chan = 0; chan <= 1; chan++) {
-            arm_biquad_cascade_df1_init_q31(&biquad_cascade[i + chan], 1, &freq_band_coeffs[i * 5], &biquad_state[4 * (i + chan)], COEFF_POSTSHIFT);
+            arm_biquad_cascade_df1_init_q31(&biquad_cascade[i + chan], 1, &freq_band_coeffs[(i / 2) * 5], &biquad_state[4 * (i + chan)], COEFF_POSTSHIFT);
         }
     }
 }
@@ -91,8 +91,16 @@ void biquad_eq_set_fs(int fs) {
 
 void biquad_eq_init(void) {
     // TODO read stored gains
+    freq_band_gains[0] = 0;
     freq_band_gains[1] = 2;
     freq_band_gains[2] = 2;
+    freq_band_gains[3] = 0;
+    freq_band_gains[4] = 0;
+    freq_band_gains[5] = 0;
+    freq_band_gains[6] = 0;
+    freq_band_gains[7] = 0;
+    freq_band_gains[8] = 0;
+    freq_band_gains[9] = 0;
 
     // calculate default coefficients and init cascades
     biquad_eq_update_coeffs();
@@ -116,7 +124,7 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
             // Run through all cascades
             // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
             // TODO compare with arm_biquad_cas_df1_32x64_q31
-            for(int stage = 0; stage < 4 * 2; stage += 2) {
+            for(int stage = 0; stage < 6 * 2; stage += 2) {
                 arm_biquad_cascade_df1_q31(&biquad_cascade[stage + chan], samplesQ31, samplesQ31, BLOCKSIZE);
             }
 
@@ -143,7 +151,7 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
             // Run through all cascades
             // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
             // TODO compare with arm_biquad_cas_df1_32x64_q31
-            for(int stage = 0; stage < 4 * 2; stage += 2) {
+            for(int stage = 0; stage < 6 * 2; stage += 2) {
                 arm_biquad_cascade_df1_q31(&biquad_cascade[stage + chan], samplesQ31, samplesQ31, leftover);
             }
 
