@@ -24,14 +24,8 @@ static float freq_band_gains[NUM_EQ_STAGES] = { 0.0f };
 // b10 b11 b12 a11 a12 .. b20 b21
 static q31_t freq_band_coeffs[5 * NUM_EQ_STAGES];
 
-// 2 channels * 10 bands
-static arm_biquad_casd_df1_inst_q31 biquad_cascade[2 * NUM_EQ_STAGES];
-
 // 4 vars * 2 channels * 10 bands
 static q31_t biquad_state[4 * 2 * NUM_EQ_STAGES];
-
-// Q31 sample scratch buffer
-static q31_t samplesQ31[BLOCKSIZE];
 
 static int curr_fs = 48000;
 
@@ -79,7 +73,7 @@ void biquad_eq_update_coeffs(void) {
     // (re)init cascades
     for(int i = 0; i < NUM_EQ_STAGES * 2; i += 2) {
         for(int chan = 0; chan <= 1; chan++) {
-            arm_biquad_cascade_df1_init_q31(&biquad_cascade[i + chan], 1, &freq_band_coeffs[(i / 2) * 5], &biquad_state[4 * (i + chan)], COEFF_POSTSHIFT);
+            memset(&biquad_state[4 * (i + chan)], 0, 4 * sizeof(q31_t));
         }
     }
 }
@@ -87,6 +81,72 @@ void biquad_eq_update_coeffs(void) {
 void biquad_eq_set_fs(int fs) {
     curr_fs = fs;
     biquad_eq_update_coeffs();
+}
+
+static int mulhs(int u, int v) {
+    unsigned u0, v0, w0;
+    int u1, v1, w1, w2, t;
+    u0 = u & 0xFFFF; u1 = u >> 16;
+    v0 = v & 0xFFFF; v1 = v >> 16;
+    w0 = u0*v0;
+    t = u1*v0 + (w0 >> 16);
+    w1 = t & 0xFFFF;
+    w2 = t >> 16;
+    w1 = u0*v1 + w1;
+    return u1*v1 + w2 + (w1 >> 16);
+}
+
+static void biquad_step(q15_t *pIn, q15_t *pOut, q31_t *pStateLeft, q31_t *pStateRight, q31_t *pCoeffs, uint32_t blockSize) {
+    // Reading the coefficients
+    q31_t b0 = *pCoeffs++;
+    q31_t b1 = *pCoeffs++;
+    q31_t b2 = *pCoeffs++;
+    q31_t a1 = *pCoeffs++;
+    q31_t a2 = *pCoeffs++;
+
+    for(int i = 0; i < blockSize * 2; i++) {
+        q31_t *pState = (i % 2 == 0) ? pStateLeft : pStateRight;
+
+        // Reading the pState values
+        q31_t Xn1 = pState[0];
+        q31_t Xn2 = pState[1];
+        q31_t Yn1 = pState[2];
+        q31_t Yn2 = pState[3];
+
+        // Read the input
+        q31_t Xn = ((q31_t) pIn[i]) << 16;
+
+        // Scale
+        // TODO should probably scale by less, this makes it too quiet
+//        Xn = ((q63_t) Xn * 0x7FFFFFFF) >> 32;
+//        Xn = Xn >> 2;
+
+        // acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2]
+        q31_t acc = mulhs(b0, Xn) + mulhs(b1, Xn1) + mulhs(b2, Xn2) + mulhs(a1, Yn1) + mulhs(a2, Yn2);
+
+        // The result is converted to 1.31
+        acc = acc << COEFF_POSTSHIFT + 1;
+
+        // Store output in destination buffer.
+        pOut[i] = (int16_t) (acc >> 16);
+
+        /* Every time after the output is computed state should be updated.
+         * The states should be updated as:
+         * Xn2 = Xn1
+         * Xn1 = Xn
+         * Yn2 = Yn1
+         * Yn1 = acc */
+        Xn2 = Xn1;
+        Xn1 = Xn;
+        Yn2 = Yn1;
+        Yn1 = (q31_t) acc;
+
+        // Store the updated state variables back into the pState array
+        pState[0] = Xn1;
+        pState[1] = Xn2;
+        pState[2] = Yn1;
+        pState[3] = Yn2;
+    }
 }
 
 void biquad_eq_init(void) {
@@ -107,59 +167,9 @@ void biquad_eq_init(void) {
 }
 
 void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
-    int numblocks = len / BLOCKSIZE;
-    int leftover = len % BLOCKSIZE;
-
-    for(int i = 0; i < numblocks; i++) {
-        for(int chan = 0; chan <= 1; chan++) {
-            // q16 -> q31
-            int k = 0;
-            for(int j = 0; j < BLOCKSIZE * 2; j += 2) {
-                samplesQ31[k++] = ((q31_t) samples[(i * BLOCKSIZE * 2) + j + chan]) << 16;
-            }
-
-            // Scale down by 1/8 so we don't clip when adding gain
-            arm_scale_q31(samplesQ31, 0x7FFFFFFF, -3, samplesQ31, BLOCKSIZE);
-
-            // Run through all cascades
-            // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
-            // TODO compare with arm_biquad_cas_df1_32x64_q31
-            for(int stage = 0; stage < 6 * 2; stage += 2) {
-                arm_biquad_cascade_df1_q31(&biquad_cascade[stage + chan], samplesQ31, samplesQ31, BLOCKSIZE);
-            }
-
-            // q31 -> q16
-            k = 0;
-            for(int j = 0; j < BLOCKSIZE * 2; j += 2) {
-                samples[(i * BLOCKSIZE * 2) + j + chan] = (int16_t) (samplesQ31[k++] >> 16);
-            }
-        }
-    }
-
-    // repeat for any non-even multiples of BLOCKSIZE (44.1)
-    if(leftover) {
-        for(int chan = 0; chan <= 1; chan++) {
-            // q16 -> q31
-            int k = 0;
-            for(int j = 0; j < leftover * 2; j += 2) {
-                samplesQ31[k++] = ((q31_t) samples[(numblocks * BLOCKSIZE * 2) + j + chan]) << 16;
-            }
-
-            // Scale down by 1/8 so we don't clip when adding gain
-            arm_scale_q31(samplesQ31, 0x7FFFFFFF, -3, samplesQ31, leftover);
-
-            // Run through all cascades
-            // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
-            // TODO compare with arm_biquad_cas_df1_32x64_q31
-            for(int stage = 0; stage < 6 * 2; stage += 2) {
-                arm_biquad_cascade_df1_q31(&biquad_cascade[stage + chan], samplesQ31, samplesQ31, leftover);
-            }
-
-            // q31 -> q16
-            k = 0;
-            for(int j = 0; j < leftover * 2; j += 2) {
-                samples[(numblocks * BLOCKSIZE * 2) + j + chan] = (int16_t) (samplesQ31[k++] >> 16);
-            }
-        }
+    // Run through all cascades
+    // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
+    for(int stage = 0; stage < 6 * 2; stage += 2) {
+        biquad_step(samples, samples, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len);
     }
 }
