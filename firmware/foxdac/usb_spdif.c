@@ -318,8 +318,8 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     // todo deal with blocking correctly
 
     gpio_put(25, 1);
-    struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
-    gpio_put(25, 0);
+    struct audio_buffer* audio_buffer = take_audio_buffer(producer_pool, true);
+
 
     DEBUG_PINS_CLR(audio_timing, 1);
     //assert(!(usb_buffer->data_len & 3u));
@@ -341,6 +341,7 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     biquad_eq_process_inplace(out, audio_buffer->sample_count);
 
     give_audio_buffer(producer_pool, audio_buffer);
+    gpio_put(25, 0);
 
     //gpio_put(25, 0);
 
@@ -656,7 +657,6 @@ bool _as_setup_request_handler(__unused struct usb_endpoint *ep, struct usb_setu
 }
 
 void usb_sound_card_init() {
-    //msd_interface.setup_request_handler = msd_setup_request_handler;
     usb_interface_init(&ac_interface, &audio_device_config.ac_interface, NULL, 0, true);
     ac_interface.setup_request_handler = ac_setup_request_handler;
 
@@ -708,6 +708,8 @@ struct audio_buffer_format producer_format = {
 // core 1 handles low-priority tasks: LVGL, OLED, WM8805 polling and TPA6130 volume
 
 static void core1_worker() {
+    biquad_eq_init_core1();
+
     // Init the oled twice, in case the first time glitched
     busy_wait_ms(50);
     oled_init();

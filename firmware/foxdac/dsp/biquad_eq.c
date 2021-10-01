@@ -5,6 +5,10 @@
  *      Author: alex
  */
 
+#include "pico/stdlib.h"
+#include "pico/multicore.h"
+#include "hardware/irq.h"
+
 #include "arm_math.h"
 
 // Block size for the underlying processing
@@ -22,16 +26,25 @@ static float freq_band_gains[NUM_EQ_STAGES] = { 0.0f };
 
 // 5 coefficients per filter stage, in the following order:
 // b10 b11 b12 a11 a12 .. b20 b21
-static q31_t freq_band_coeffs[5 * NUM_EQ_STAGES];
+static volatile q31_t freq_band_coeffs[5 * NUM_EQ_STAGES];
 
 // 4 vars * 2 channels * 10 bands
-static q31_t biquad_state[4 * 2 * NUM_EQ_STAGES];
+static volatile q31_t biquad_state[4 * 2 * NUM_EQ_STAGES];
 
 static int curr_fs = 48000;
 
+volatile int16_t* core2_sample_buf;
+static volatile int sample_cnt = 0;
+
+typedef enum {
+   LEFT_CHANNEL,
+   RIGHT_CHANNEL,
+   BOTH_CHANNELS
+} channel_sel_t;
+
 // based on http://www.earlevel.com/scripts/widgets/20131013/biquads2.js
 // equations from http://shepazu.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html
-static void calc_biquad_peaking_coeff(double Q, double peakGain, double Fc, double Fs, q31_t* coeffs) {
+static void calc_biquad_peaking_coeff(double Q, double peakGain, double Fc, double Fs, volatile q31_t* coeffs) {
     double norm, a0, a1, a2, b1, b2;
 
     double V = pow(10, fabs(peakGain) / 20.0);
@@ -73,7 +86,7 @@ void biquad_eq_update_coeffs(void) {
     // (re)init cascades
     for(int i = 0; i < NUM_EQ_STAGES * 2; i += 2) {
         for(int chan = 0; chan <= 1; chan++) {
-            memset(&biquad_state[4 * (i + chan)], 0, 4 * sizeof(q31_t));
+            memset((q31_t*) &biquad_state[4 * (i + chan)], 0, 4 * sizeof(q31_t));
         }
     }
 }
@@ -96,7 +109,33 @@ static int mulhs(int u, int v) {
     return u1*v1 + w2 + (w1 >> 16);
 }
 
-static void biquad_step(q15_t *pIn, q15_t *pOut, q31_t *pStateLeft, q31_t *pStateRight, q31_t *pCoeffs, uint32_t blockSize) {
+//static int mulhs(int a, int b) {
+//    short t0,t1,t2;
+//    __asm__ volatile (
+//            " .syntax unified\n"
+//            "uxth %2,%0 // b\n"
+//            "lsrs %0,%0,#16 // a\n"
+//            "lsrs %3,%1,#16 // c\n"
+//            "uxth %1,%1 // d\n"
+//            "movs %4,%1 // d\n"
+//            "muls %1,%2 // bd\n"
+//            "muls %4,%0 // ad\n"
+//            "muls %0,%3 // ac\n"
+//            "muls %3,%2 // bc\n"
+//            "lsls %2,%4,#16 // ad => d0\n"
+//            "lsrs %4,%4,#16 // ad => 0ay"
+//            "adds %1,%1,%2 // bd + d0\n"
+//            "adcs %0,%4 // ac + 0a + C\n"
+//            "lsls %2,%3,#16 // bc => c0\n"
+//            "lsrs %3,%3,#16 // bc => 0b\n"
+//            "adds %1,%1,%2 // bd + c0\n"
+//            "adcs %0,%3 // ac + 0b + C\n"
+//
+//            :"+l"(a):"l"(b),"l"(t0),"l"(t1),"l"(t2));
+//    return a;
+//}
+
+static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_t *pStateLeft, volatile q31_t *pStateRight, volatile q31_t *pCoeffs, uint32_t blockSize, channel_sel_t channel_sel) {
     // Reading the coefficients
     q31_t b0 = *pCoeffs++;
     q31_t b1 = *pCoeffs++;
@@ -104,8 +143,10 @@ static void biquad_step(q15_t *pIn, q15_t *pOut, q31_t *pStateLeft, q31_t *pStat
     q31_t a1 = *pCoeffs++;
     q31_t a2 = *pCoeffs++;
 
-    for(int i = 0; i < blockSize * 2; i++) {
-        q31_t *pState = (i % 2 == 0) ? pStateLeft : pStateRight;
+    int stride = channel_sel == BOTH_CHANNELS ? 1 : 2;
+    for(int step = 0; step < blockSize * 2; step += stride) {
+        int i = (channel_sel == RIGHT_CHANNEL) ? step + 1 : step;
+        volatile q31_t *pState = (i % 2 == 0) ? pStateLeft : pStateRight;
 
         // Reading the pState values
         q31_t Xn1 = pState[0];
@@ -118,8 +159,8 @@ static void biquad_step(q15_t *pIn, q15_t *pOut, q31_t *pStateLeft, q31_t *pStat
 
         // Scale
         // TODO should probably scale by less, this makes it too quiet
-//        Xn = ((q63_t) Xn * 0x7FFFFFFF) >> 32;
-//        Xn = Xn >> 2;
+        //Xn = (((q63_t) Xn) * ((q31_t) 0x7FFFFFFF)) >> 32;
+        //Xn = Xn >> 2;
 
         // acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2]
         q31_t acc = mulhs(b0, Xn) + mulhs(b1, Xn1) + mulhs(b2, Xn2) + mulhs(a1, Yn1) + mulhs(a2, Yn2);
@@ -166,10 +207,40 @@ void biquad_eq_init(void) {
     biquad_eq_update_coeffs();
 }
 
+static void core1_irq_handler() {
+    while(multicore_fifo_rvalid()) {
+        multicore_fifo_pop_blocking();
+
+        for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
+            biquad_step(core2_sample_buf, core2_sample_buf, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], sample_cnt, RIGHT_CHANNEL);
+        }
+    }
+
+    multicore_fifo_clear_irq();
+    multicore_fifo_push_blocking(0);
+}
+
+void biquad_eq_init_core1(void) {
+    multicore_fifo_clear_irq();
+    irq_set_exclusive_handler(SIO_IRQ_PROC1, core1_irq_handler);
+    irq_set_enabled(SIO_IRQ_PROC1, true);
+}
+
 void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
+    sample_cnt = len;
+    core2_sample_buf = samples;
+
+    multicore_fifo_push_blocking(0);
+
     // Run through all cascades
     // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
-    for(int stage = 0; stage < 6 * 2; stage += 2) {
-        biquad_step(samples, samples, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len);
+    for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
+        //biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, BOTH_CHANNELS);
+
+        biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, LEFT_CHANNEL);
+    }
+
+    while(multicore_fifo_rvalid()) {
+        multicore_fifo_pop_blocking();
     }
 }
