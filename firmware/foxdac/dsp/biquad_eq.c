@@ -110,72 +110,75 @@ void biquad_eq_set_fs(int fs) {
 //}
 
 // Based on https://community.arm.com/developer/ip-products/processors/f/cortex-m-forum/49526/mulshift32-in-14-cycles
-//static int mulhs(int a, int b) {
-//    register int t0, t1;
-//    __asm__ volatile (
-//            " .syntax unified\n"
-//
-//            "asrs %[t1], %[a], #16 //Factor0 hi [16:31] \n"
-//            "uxth %[a], %[a] //Factor0 lo [0:15] \n"
-//            "uxth %[t0], %[b] //Factor1 lo [0:15] \n"
-//            "asrs %[b], %[b], #16 //Factor1 hi [16:31] \n"
-//
-//            "muls %[a], %[b] //Factor0 lo * Factor1 hi \n"
-//            "muls %[t0], %[t1] //Factor1 lo * Factor0 hi \n"
-//            "muls %[b], %[t1] //Factor1 hi * Factor0 hi \n"
-//
-//            "adds %[a], %[t0] //(Factor0 lo * Factor1 hi) + (Factor1 lo * Factor0 hi) \n"
-//
-//            "adcs %[t0], %[t0] //C --> bit 16 (t0 contains $00000000 or $00010000) \n"
-//            "lsls %[t0], %[t0], #16 // \n"
-//
-//            "lsrs %[t1], %[a], #16 //Extract partial result [bits 16-31] \n"
-//
-//            "adds %[t0], %[t1] //Partial [bits 16-47] \n"
-//            "adds %[b], %[t0] //Results [bit 32-63] \n"
-//
-//            : [a] "+l" (a), [b] "+l" (b), [t0] "+l" (t0), [t1] "+l" (t1)
-//            : );
-//    return b;
-//}
-
-static __attribute__((always_inline)) int mulhs(int a, int b) {
-    register int t0, t1, t2;
+static int mulhs(int a, int b) {
+    register int t0, t1;
     __asm__ volatile (
             " .syntax unified\n"
 
-            "uxth    %[t0],%[a]           // b \n"
-            "asrs    %[a],%[a],#16       // a \n"
-            "asrs    %[t1],%[b],#16       // c \n"
-            "uxth    %[b],%[b]           // d \n"
-            "movs    %[t2],%[b]           // d \n"
+            "asrs %[t1], %[a], #16 //Factor0 hi [16:31] \n"
+            "uxth %[a], %[a] //Factor0 lo [0:15] \n"
+            "uxth %[t0], %[b] //Factor1 lo [0:15] \n"
+            "asrs %[b], %[b], #16 //Factor1 hi [16:31] \n"
 
-            "muls    %[b],%[t0]           // bd \n"
-            "muls    %[t2],%[a]           // ad \n"
-            "muls    %[a],%[t1]           // ac \n"
-            "muls    %[t1],%[t0]           // bc \n"
+            "muls %[a], %[b] //Factor0 lo * Factor1 hi \n"
+            "muls %[t0], %[t1] //Factor1 lo * Factor0 hi \n"
+            "muls %[b], %[t1] //Factor1 hi * Factor0 hi \n"
 
-            "lsls    %[t0],%[t2],#16 \n"
-            "asrs    %[t2],%[t2],#16 \n"
-            "adds    %[b],%[t0] \n"
-            "adcs    %[a],%[t2] \n"
-            "lsls    %[t0],%[t1],#16 \n"
-            "asrs    %[t1],%[t1],#16 \n"
-            "adds    %[b],%[t0] \n"
-            "adcs    %[a],%[t1] \n"
+            "adds %[a], %[t0] //(Factor0 lo * Factor1 hi) + (Factor1 lo * Factor0 hi) \n"
 
-            : [a] "+l" (a), [b] "+l" (b), [t0] "+l" (t0), [t1] "+l" (t1), [t2] "+l" (t2)
+            // TODO surely this is important? but output is 1 off with negative numbers
+            //"movs %[t0], #0 \n"
+            //"adcs %[t0], %[t0] //C --> bit 16 (t0 contains $00000000 or $00010000) \n"
+            //"lsls %[t0], %[t0], #16 // \n"
+
+            "asrs %[t1], %[a], #16 //Extract partial result [bits 16-31] \n"
+
+            //"adds %[t0], %[t1] //Partial [bits 16-47] \n"
+            "adds %[b], %[t1] //Results [bit 32-63] \n" // should be t0
+
+            : [a] "+l" (a), [b] "+l" (b), [t0] "+l" (t0), [t1] "+l" (t1)
             : );
-    return a;
+    return b;
 }
 
-static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_t *pStateLeft, volatile q31_t *pStateRight, volatile q31_t *pCoeffs, uint32_t blockSize, channel_sel_t channel_sel) {
+//static __attribute__((always_inline)) int mulhs(int a, int b) {
+//    register int t0, t1, t2;
+//    __asm__ volatile (
+//            " .syntax unified\n"
+//
+//            "uxth    %[t0],%[a]           // b \n"
+//            "asrs    %[a],%[a],#16       // a \n"
+//            "asrs    %[t1],%[b],#16       // c \n"
+//            "uxth    %[b],%[b]           // d \n"
+//            "movs    %[t2],%[b]           // d \n"
+//
+//            "muls    %[b],%[t0]           // bd \n"
+//            "muls    %[t2],%[a]           // ad \n"
+//            "muls    %[a],%[t1]           // ac \n"
+//            "muls    %[t1],%[t0]           // bc \n"
+//
+//            "lsls    %[t0],%[t2],#16 \n"
+//            "asrs    %[t2],%[t2],#16 \n"
+//            "adds    %[b],%[t0] \n"
+//            "adcs    %[a],%[t2] \n"
+//            "lsls    %[t0],%[t1],#16 \n"
+//            "asrs    %[t1],%[t1],#16 \n"
+//            "adds    %[b],%[t0] \n"
+//            "adcs    %[a],%[t1] \n"
+//
+//            : [a] "+l" (a), [b] "+l" (b), [t0] "+l" (t0), [t1] "+l" (t1), [t2] "+l" (t2)
+//            : );
+//    return a;
+//}
+
+static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_t *pStateLeft,
+        volatile q31_t *pStateRight, volatile q31_t *pCoeffs, uint32_t blockSize, channel_sel_t channel_sel) {
     // Reading the coefficients
-    q31_t b0 = *pCoeffs++;
-    q31_t b1 = *pCoeffs++;
-    q31_t b2 = *pCoeffs++;
-    q31_t a1 = *pCoeffs++;
-    q31_t a2 = *pCoeffs++;
+    const q31_t b0 = *pCoeffs++;
+    const q31_t b1 = *pCoeffs++;
+    const q31_t b2 = *pCoeffs++;
+    const q31_t a1 = *pCoeffs++;
+    const q31_t a2 = *pCoeffs++;
 
     int stride = channel_sel == BOTH_CHANNELS ? 1 : 2;
     for(int step = 0; step < blockSize * 2; step += stride) {
@@ -241,7 +244,9 @@ void biquad_eq_init(void) {
     biquad_eq_update_coeffs();
 
 //    printf("100x100 %lx %lx\n", mulhs(100, 100), mulhs3(100, 100));
-//    printf("DB %lx %lx\n", mulhsu(0xDEADBEEF, 0xDEADC0DE), mulhs3(0xDEADBEEF, 0xDEADC0DE));
+//    printf("DB %lx %lx %lx\n", mulhsc(0xDEADBEEF, 0xDEADC0DE), mulhs(0xDEADBEEF, 0xDEADC0DE), mulhs2(0xDEADBEEF, 0xDEADC0DE));
+//    printf("DB %lx %lx %lx\n", mulhsc(0x55555555, 0x10000000), mulhs(0x55555555, 0x10000000), mulhs2(0x55555555, 0x10000000));
+
 //    printf("5 %lx %lx\n", mulhs(0x55555555, 0x55555555), mulhs3(0x55555555, 0x55555555));
 //    printf("eq %lx %lx\n", mulhs(0xDEADBEEF, 0xDEADBEEF), mulhs3(0xDEADBEEF, 0xDEADBEEF));
 //    printf("5sh %lx %lx\n", mulhs(0x55555555, 0x10000000), mulhs3(0x55555555, 0x10000000));
@@ -253,7 +258,8 @@ static void core1_irq_handler() {
         multicore_fifo_pop_blocking();
 
         for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
-            biquad_step(core2_sample_buf, core2_sample_buf, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], sample_cnt, RIGHT_CHANNEL);
+            biquad_step(core2_sample_buf, core2_sample_buf, &biquad_state[4 * (stage + 0)],
+                    &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], sample_cnt, RIGHT_CHANNEL);
         }
     }
 
@@ -276,9 +282,8 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
     // Run through all cascades
     // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
     for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
-        //biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, BOTH_CHANNELS);
-
-        biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)], &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, LEFT_CHANNEL);
+        biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)],
+                &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS
     }
 
     while(multicore_fifo_rvalid()) {
