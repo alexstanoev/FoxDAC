@@ -96,44 +96,78 @@ void biquad_eq_set_fs(int fs) {
     biquad_eq_update_coeffs();
 }
 
-static int mulhs(int u, int v) {
-    unsigned u0, v0, w0;
-    int u1, v1, w1, w2, t;
-    u0 = u & 0xFFFF; u1 = u >> 16;
-    v0 = v & 0xFFFF; v1 = v >> 16;
-    w0 = u0*v0;
-    t = u1*v0 + (w0 >> 16);
-    w1 = t & 0xFFFF;
-    w2 = t >> 16;
-    w1 = u0*v1 + w1;
-    return u1*v1 + w2 + (w1 >> 16);
-}
+//static int mulhs(int u, int v) {
+//    unsigned u0, v0, w0;
+//    int u1, v1, w1, w2, t;
+//    u0 = u & 0xFFFF; u1 = u >> 16;
+//    v0 = v & 0xFFFF; v1 = v >> 16;
+//    w0 = u0*v0;
+//    t = u1*v0 + (w0 >> 16);
+//    w1 = t & 0xFFFF;
+//    w2 = t >> 16;
+//    w1 = u0*v1 + w1;
+//    return u1*v1 + w2 + (w1 >> 16);
+//}
 
+// Based on https://community.arm.com/developer/ip-products/processors/f/cortex-m-forum/49526/mulshift32-in-14-cycles
 //static int mulhs(int a, int b) {
-//    short t0,t1,t2;
+//    register int t0, t1;
 //    __asm__ volatile (
 //            " .syntax unified\n"
-//            "uxth %2,%0 // b\n"
-//            "lsrs %0,%0,#16 // a\n"
-//            "lsrs %3,%1,#16 // c\n"
-//            "uxth %1,%1 // d\n"
-//            "movs %4,%1 // d\n"
-//            "muls %1,%2 // bd\n"
-//            "muls %4,%0 // ad\n"
-//            "muls %0,%3 // ac\n"
-//            "muls %3,%2 // bc\n"
-//            "lsls %2,%4,#16 // ad => d0\n"
-//            "lsrs %4,%4,#16 // ad => 0ay"
-//            "adds %1,%1,%2 // bd + d0\n"
-//            "adcs %0,%4 // ac + 0a + C\n"
-//            "lsls %2,%3,#16 // bc => c0\n"
-//            "lsrs %3,%3,#16 // bc => 0b\n"
-//            "adds %1,%1,%2 // bd + c0\n"
-//            "adcs %0,%3 // ac + 0b + C\n"
 //
-//            :"+l"(a):"l"(b),"l"(t0),"l"(t1),"l"(t2));
-//    return a;
+//            "asrs %[t1], %[a], #16 //Factor0 hi [16:31] \n"
+//            "uxth %[a], %[a] //Factor0 lo [0:15] \n"
+//            "uxth %[t0], %[b] //Factor1 lo [0:15] \n"
+//            "asrs %[b], %[b], #16 //Factor1 hi [16:31] \n"
+//
+//            "muls %[a], %[b] //Factor0 lo * Factor1 hi \n"
+//            "muls %[t0], %[t1] //Factor1 lo * Factor0 hi \n"
+//            "muls %[b], %[t1] //Factor1 hi * Factor0 hi \n"
+//
+//            "adds %[a], %[t0] //(Factor0 lo * Factor1 hi) + (Factor1 lo * Factor0 hi) \n"
+//
+//            "adcs %[t0], %[t0] //C --> bit 16 (t0 contains $00000000 or $00010000) \n"
+//            "lsls %[t0], %[t0], #16 // \n"
+//
+//            "lsrs %[t1], %[a], #16 //Extract partial result [bits 16-31] \n"
+//
+//            "adds %[t0], %[t1] //Partial [bits 16-47] \n"
+//            "adds %[b], %[t0] //Results [bit 32-63] \n"
+//
+//            : [a] "+l" (a), [b] "+l" (b), [t0] "+l" (t0), [t1] "+l" (t1)
+//            : );
+//    return b;
 //}
+
+static __attribute__((always_inline)) int mulhs(int a, int b) {
+    register int t0, t1, t2;
+    __asm__ volatile (
+            " .syntax unified\n"
+
+            "uxth    %[t0],%[a]           // b \n"
+            "asrs    %[a],%[a],#16       // a \n"
+            "asrs    %[t1],%[b],#16       // c \n"
+            "uxth    %[b],%[b]           // d \n"
+            "movs    %[t2],%[b]           // d \n"
+
+            "muls    %[b],%[t0]           // bd \n"
+            "muls    %[t2],%[a]           // ad \n"
+            "muls    %[a],%[t1]           // ac \n"
+            "muls    %[t1],%[t0]           // bc \n"
+
+            "lsls    %[t0],%[t2],#16 \n"
+            "asrs    %[t2],%[t2],#16 \n"
+            "adds    %[b],%[t0] \n"
+            "adcs    %[a],%[t2] \n"
+            "lsls    %[t0],%[t1],#16 \n"
+            "asrs    %[t1],%[t1],#16 \n"
+            "adds    %[b],%[t0] \n"
+            "adcs    %[a],%[t1] \n"
+
+            : [a] "+l" (a), [b] "+l" (b), [t0] "+l" (t0), [t1] "+l" (t1), [t2] "+l" (t2)
+            : );
+    return a;
+}
 
 static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_t *pStateLeft, volatile q31_t *pStateRight, volatile q31_t *pCoeffs, uint32_t blockSize, channel_sel_t channel_sel) {
     // Reading the coefficients
@@ -205,6 +239,13 @@ void biquad_eq_init(void) {
 
     // calculate default coefficients and init cascades
     biquad_eq_update_coeffs();
+
+//    printf("100x100 %lx %lx\n", mulhs(100, 100), mulhs3(100, 100));
+//    printf("DB %lx %lx\n", mulhsu(0xDEADBEEF, 0xDEADC0DE), mulhs3(0xDEADBEEF, 0xDEADC0DE));
+//    printf("5 %lx %lx\n", mulhs(0x55555555, 0x55555555), mulhs3(0x55555555, 0x55555555));
+//    printf("eq %lx %lx\n", mulhs(0xDEADBEEF, 0xDEADBEEF), mulhs3(0xDEADBEEF, 0xDEADBEEF));
+//    printf("5sh %lx %lx\n", mulhs(0x55555555, 0x10000000), mulhs3(0x55555555, 0x10000000));
+//    printf("5sh %lx %lx\n", mulhs(0x80000000, 0xFFFFFFFF), mulhs3(0x80000000, 0xFFFFFFFF));
 }
 
 static void core1_irq_handler() {
