@@ -11,17 +11,15 @@
 
 #include "arm_math.h"
 
-// Block size for the underlying processing
-#define BLOCKSIZE 64
-
-#define NUM_EQ_STAGES 10
+#define NUM_EQ_STAGES 8
 
 #define FILTER_Q 0.707
 
 #define Q28_SCALE_FACTOR 268435456.0f
 #define COEFF_POSTSHIFT 3
 
-static int freq_bands[NUM_EQ_STAGES] = { 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
+//static int freq_bands[NUM_EQ_STAGES] = { 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
+static int freq_bands[NUM_EQ_STAGES] = { 64, 125, 250, 500, 1000, 2000, 4000, 8000 };
 static float freq_band_gains[NUM_EQ_STAGES] = { 0.0f };
 
 // 5 coefficients per filter stage, in the following order:
@@ -110,7 +108,7 @@ void biquad_eq_set_fs(int fs) {
 //}
 
 // Based on https://community.arm.com/developer/ip-products/processors/f/cortex-m-forum/49526/mulshift32-in-14-cycles
-static int mulhs(int a, int b) {
+static inline int mulhs(int a, int b) {
     register int t0, t1;
     __asm__ volatile (
             " .syntax unified\n"
@@ -141,7 +139,7 @@ static int mulhs(int a, int b) {
     return b;
 }
 
-//static __attribute__((always_inline)) int mulhs(int a, int b) {
+//static int mulhs(int a, int b) {
 //    register int t0, t1, t2;
 //    __asm__ volatile (
 //            " .syntax unified\n"
@@ -174,22 +172,34 @@ static int mulhs(int a, int b) {
 static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_t *pStateLeft,
         volatile q31_t *pStateRight, volatile q31_t *pCoeffs, uint32_t blockSize, channel_sel_t channel_sel) {
     // Reading the coefficients
-    const q31_t b0 = *pCoeffs++;
-    const q31_t b1 = *pCoeffs++;
-    const q31_t b2 = *pCoeffs++;
-    const q31_t a1 = *pCoeffs++;
-    const q31_t a2 = *pCoeffs++;
+    const q31_t b0 = pCoeffs[0];
+    const q31_t b1 = pCoeffs[1];
+    const q31_t b2 = pCoeffs[2];
+    const q31_t a1 = pCoeffs[3];
+    const q31_t a2 = pCoeffs[4];
+
+    volatile q31_t *pState = (channel_sel == RIGHT_CHANNEL) ? pStateRight : pStateLeft;
+
+    // Reading the pState values
+    q31_t Xn1 = pState[0];
+    q31_t Xn2 = pState[1];
+    q31_t Yn1 = pState[2];
+    q31_t Yn2 = pState[3];
 
     int stride = channel_sel == BOTH_CHANNELS ? 1 : 2;
-    for(int step = 0; step < blockSize * 2; step += stride) {
-        int i = (channel_sel == RIGHT_CHANNEL) ? step + 1 : step;
-        volatile q31_t *pState = (i % 2 == 0) ? pStateLeft : pStateRight;
+#pragma GCC unroll 4
+    for(int i = (channel_sel == RIGHT_CHANNEL) ? 1 : 0; i < blockSize * 2; i += stride) {
 
-        // Reading the pState values
-        q31_t Xn1 = pState[0];
-        q31_t Xn2 = pState[1];
-        q31_t Yn1 = pState[2];
-        q31_t Yn2 = pState[3];
+#ifdef ENABLE_BOTH_CHANNELS
+        if(channel_sel == BOTH_CHANNELS) {
+            pState = (i % 2 == 0) ? pStateLeft : pStateRight;
+
+            Xn1 = pState[0];
+            Xn2 = pState[1];
+            Yn1 = pState[2];
+            Yn2 = pState[3];
+        }
+#endif
 
         // Read the input
         q31_t Xn = ((q31_t) pIn[i]) << 16;
@@ -219,44 +229,44 @@ static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_
         Yn2 = Yn1;
         Yn1 = (q31_t) acc;
 
-        // Store the updated state variables back into the pState array
-        pState[0] = Xn1;
-        pState[1] = Xn2;
-        pState[2] = Yn1;
-        pState[3] = Yn2;
+#ifdef ENABLE_BOTH_CHANNELS
+        if(channel_sel == BOTH_CHANNELS) {
+            // Store the updated state variables back into the pState array
+            pState[0] = Xn1;
+            pState[1] = Xn2;
+            pState[2] = Yn1;
+            pState[3] = Yn2;
+        }
+#endif
     }
+
+    // Store the updated state variables back into the pState array
+    pState[0] = Xn1;
+    pState[1] = Xn2;
+    pState[2] = Yn1;
+    pState[3] = Yn2;
 }
 
 void biquad_eq_init(void) {
     // TODO read stored gains
-    freq_band_gains[0] = 0;
+    freq_band_gains[0] = 2;
     freq_band_gains[1] = 2;
-    freq_band_gains[2] = 2;
+    freq_band_gains[2] = 0;
     freq_band_gains[3] = 0;
     freq_band_gains[4] = 0;
     freq_band_gains[5] = 0;
     freq_band_gains[6] = 0;
     freq_band_gains[7] = 0;
-    freq_band_gains[8] = 0;
-    freq_band_gains[9] = 0;
 
     // calculate default coefficients and init cascades
     biquad_eq_update_coeffs();
-
-//    printf("100x100 %lx %lx\n", mulhs(100, 100), mulhs3(100, 100));
-//    printf("DB %lx %lx %lx\n", mulhsc(0xDEADBEEF, 0xDEADC0DE), mulhs(0xDEADBEEF, 0xDEADC0DE), mulhs2(0xDEADBEEF, 0xDEADC0DE));
-//    printf("DB %lx %lx %lx\n", mulhsc(0x55555555, 0x10000000), mulhs(0x55555555, 0x10000000), mulhs2(0x55555555, 0x10000000));
-
-//    printf("5 %lx %lx\n", mulhs(0x55555555, 0x55555555), mulhs3(0x55555555, 0x55555555));
-//    printf("eq %lx %lx\n", mulhs(0xDEADBEEF, 0xDEADBEEF), mulhs3(0xDEADBEEF, 0xDEADBEEF));
-//    printf("5sh %lx %lx\n", mulhs(0x55555555, 0x10000000), mulhs3(0x55555555, 0x10000000));
-//    printf("5sh %lx %lx\n", mulhs(0x80000000, 0xFFFFFFFF), mulhs3(0x80000000, 0xFFFFFFFF));
 }
 
 static void core1_irq_handler() {
     while(multicore_fifo_rvalid()) {
         multicore_fifo_pop_blocking();
 
+#pragma GCC unroll 6
         for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
             biquad_step(core2_sample_buf, core2_sample_buf, &biquad_state[4 * (stage + 0)],
                     &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], sample_cnt, RIGHT_CHANNEL);
@@ -280,7 +290,7 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
     multicore_fifo_push_blocking(0);
 
     // Run through all cascades
-    // TODO 4 should be NUM_EQ_STAGES but that takes too long for the IRQ
+#pragma GCC unroll 6
     for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
         biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)],
                 &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS
