@@ -22,6 +22,7 @@
 
 #include "drivers/wm8805/wm8805.h"
 #include "drivers/tpa6130/tpa6130.h"
+#include "drivers/ssd1306/ssd1306.h"
 
 #include "dsp/biquad_eq.h"
 
@@ -279,6 +280,8 @@ int overruns = 0;
 #define SOF_AVG_BUF_SIZE_F 50.0f
 static volatile uint8_t sof_dma_buf[SOF_AVG_BUF_SIZE];
 static volatile uint8_t sof_dma_buf_pos = 0, sof_dma_buf_filled = 0;
+
+volatile uint8_t usb_host_seen = 0, ui_suspended = 0;
 
 static volatile uint32_t rate = 48000;
 
@@ -545,6 +548,9 @@ static void audio_set_volume(int16_t volume) {
 }
 
 static void audio_cmd_packet(struct usb_endpoint *ep) {
+    // an audio-aware USB host has inited us
+    usb_host_seen = 1;
+
     assert(audio_control_cmd_t.cmd == AUDIO_REQ_SetCurrent);
     struct usb_buffer *buffer = usb_current_out_packet_buffer(ep);
     audio_control_cmd_t.cmd = 0;
@@ -729,19 +735,19 @@ static void core1_worker() {
 
     while(1) {
         // suspend if we had inited usb once (otherwise can't distinguish between 5V only)
-        // only do that if the USB input is selected?
-//        if(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS && usb_host_seen && !suspended) {
-//
-//            ssd1306_SetDisplayOn(0);
-//            // we're suspended, TODO turn off the OLED
-//            //ui_set_sr_text("SUSPEND");
-//
-//            // turn off underrun led
-//            gpio_put(18, 0);
-//        } else if(usb_host_seen && suspended){
-//            // waking up
-//            ssd1306_SetDisplayOn(0);
-//        }
+        // TODO only do that if the USB input is selected?
+        if((usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) && usb_host_seen && !ui_suspended) {
+
+            ssd1306_SetDisplayOn(0);
+            ui_suspended = 1;
+
+            // turn off underrun led
+            gpio_put(18, 0);
+        } else if(!(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) && usb_host_seen && ui_suspended) {
+            // waking up
+            ssd1306_SetDisplayOn(1);
+            ui_suspended = 0;
+        }
 
         ui_loop();
 

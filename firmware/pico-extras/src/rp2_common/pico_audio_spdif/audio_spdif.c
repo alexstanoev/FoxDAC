@@ -321,12 +321,8 @@ static void __time_critical_func(audio_start_dma_transfer)() {
     shared_state.playing_buffer = ab;
     if (!ab) {
 
-        gpio_put(18, 1);
-
-//gpio_put(28, !gpio_get(28));
-//gpio_put(28, !gpio_get(28));
-//gpio_put(28, !gpio_get(28));
-//gpio_put(28, !gpio_get(28));
+        extern volatile uint8_t ui_suspended;
+        if(!ui_suspended) gpio_put(18, 1);
 
         //DEBUG_PINS_XOR(audio_timing, 1);
         //DEBUG_PINS_XOR(audio_timing, 2);
@@ -337,10 +333,6 @@ static void __time_critical_func(audio_start_dma_transfer)() {
 
         extern int overruns;
         overruns++;
-
-
-        // TODO led
-        //printf("UNDERRUN\n");
     } else {
         gpio_put(18, 0);
 
