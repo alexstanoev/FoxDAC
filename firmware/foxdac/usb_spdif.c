@@ -37,6 +37,8 @@ static char *descriptor_strings[] =
         "0123456789AB"
 };
 
+#define ENABLE_EQ 0
+
 // todo fix these
 #define VENDOR_ID   0x2e8au
 #define PRODUCT_ID  0xfeddu
@@ -338,7 +340,9 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
 
     spectrum_consume_samples(out, audio_buffer->sample_count, audio_state.freq);
 
+#if ENABLE_EQ
     biquad_eq_process_inplace(out, audio_buffer->sample_count);
+#endif
 
     give_audio_buffer(producer_pool, audio_buffer);
     gpio_put(25, 0);

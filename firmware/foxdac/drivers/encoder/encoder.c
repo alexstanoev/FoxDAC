@@ -14,12 +14,11 @@
 #include "encoder.pio.h"
 
 // new encoder source is backwards and twice the steps
-#define NEW_ENCODER 0
+#define NEW_ENCODER 1
 
 #define LAST_STATE(state)  ((state) & 0b0011)
 #define CURR_STATE(state)  (((state) & 0b1100) >> 2)
 
-#define DEFAULT_COUNTS_PER_REV     24
 #define DEFAULT_COUNT_MICROSTEPS   0
 #define DEFAULT_FREQ_DIVIDER       250
 
@@ -47,10 +46,8 @@ const int pinA = 19;
 const int pinB = 20;
 const int pinC = 21;
 
-const float counts_per_revolution   = DEFAULT_COUNTS_PER_REV;
 volatile bool count_microsteps         = DEFAULT_COUNT_MICROSTEPS;
 const uint16_t freq_divider         = DEFAULT_FREQ_DIVIDER;
-const float clocks_per_time         = 0;
 
 //--------------------------------------------------
 
@@ -161,7 +158,7 @@ static void __not_in_flash_func(pio1_interrupt_callback)() {
             // A ‾‾‾‾|____
             // B ‾‾‾‾‾‾‾‾‾
             case MICROSTEP_3:
-                if(count_microsteps)
+                if(count_microsteps || NEW_ENCODER)
                 microstep_up(time_received);
 
                 last_travel_dir = CLOCKWISE;  //Started turning clockwise
@@ -170,7 +167,7 @@ static void __not_in_flash_func(pio1_interrupt_callback)() {
                 // A ‾‾‾‾‾‾‾‾‾
                 // B ‾‾‾‾|____
             case MICROSTEP_1:
-                if(count_microsteps)
+                if(count_microsteps || NEW_ENCODER)
                 microstep_down(time_received);
 
                 last_travel_dir = COUNTERCLOCK; //Started turning counter-clockwise
