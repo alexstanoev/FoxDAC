@@ -15,6 +15,7 @@
 
 #define FILTER_Q 0.707
 
+#define INPUT_SCALE_FACTOR 0x000065ac
 #define Q28_SCALE_FACTOR 268435456.0f
 #define COEFF_POSTSHIFT 3
 
@@ -202,12 +203,10 @@ static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_
 #endif
 
         // Read the input
-        q31_t Xn = ((q31_t) pIn[i]) << 16;
+        //q31_t Xn = ((q31_t) pIn[i]) << 16;
 
-        // Scale
-        // TODO should probably scale by less, this makes it too quiet
-        //Xn = (((q63_t) Xn) * ((q31_t) 0x7FFFFFFF)) >> 32;
-        //Xn = Xn >> 2;
+        // Read and scale down a bit to avoid clipping EQ gain
+        q31_t Xn = ((((q31_t) pIn[i]) * INPUT_SCALE_FACTOR) >> 15) << 16;
 
         // acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2]
         q31_t acc = mulhs(b0, Xn) + mulhs(b1, Xn1) + mulhs(b2, Xn2) + mulhs(a1, Yn1) + mulhs(a2, Yn2);
