@@ -23,6 +23,8 @@
 #include "drivers/wm8805/wm8805.h"
 #include "drivers/tpa6130/tpa6130.h"
 
+#include "dsp/biquad_eq.h"
+
 CU_REGISTER_DEBUG_PINS(audio_timing)
 
 // ---- select at most one ---
@@ -316,8 +318,8 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
     // todo deal with blocking correctly
 
     gpio_put(25, 1);
-    struct audio_buffer *audio_buffer = take_audio_buffer(producer_pool, true);
-    gpio_put(25, 0);
+    struct audio_buffer* audio_buffer = take_audio_buffer(producer_pool, true);
+
 
     DEBUG_PINS_CLR(audio_timing, 1);
     //assert(!(usb_buffer->data_len & 3u));
@@ -336,7 +338,10 @@ static void __not_in_flash_func(_as_audio_packet)(struct usb_endpoint *ep) {
 
     spectrum_consume_samples(out, audio_buffer->sample_count, audio_state.freq);
 
+    biquad_eq_process_inplace(out, audio_buffer->sample_count);
+
     give_audio_buffer(producer_pool, audio_buffer);
+    gpio_put(25, 0);
 
     //gpio_put(25, 0);
 
@@ -515,6 +520,8 @@ static void _audio_reconfigure() {
     // todo hack overwriting const
     ((struct audio_format *) producer_pool->format)->sample_freq = audio_state.freq;
 
+    biquad_eq_set_fs(audio_state.freq);
+
     rate = audio_state.freq;
     sof_dma_buf_filled = 0;
     sof_dma_buf_pos = 0;
@@ -650,7 +657,6 @@ bool _as_setup_request_handler(__unused struct usb_endpoint *ep, struct usb_setu
 }
 
 void usb_sound_card_init() {
-    //msd_interface.setup_request_handler = msd_setup_request_handler;
     usb_interface_init(&ac_interface, &audio_device_config.ac_interface, NULL, 0, true);
     ac_interface.setup_request_handler = ac_setup_request_handler;
 
@@ -702,6 +708,8 @@ struct audio_buffer_format producer_format = {
 // core 1 handles low-priority tasks: LVGL, OLED, WM8805 polling and TPA6130 volume
 
 static void core1_worker() {
+    biquad_eq_init_core1();
+
     // Init the oled twice, in case the first time glitched
     busy_wait_ms(50);
     oled_init();
@@ -753,6 +761,9 @@ void core0_init() {
 
     // Grant high bus priority to the DMA
     bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
+
+    // Init EQ
+    biquad_eq_init();
 
     producer_pool = audio_new_producer_pool(&producer_format, AUDIO_BUFFER_COUNT, 192);
 
