@@ -219,7 +219,7 @@ void spectrum_start(void) {
 
 void spectrum_stop(void) {
     spectrum_running = 0;
-    lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
+    //lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     lv_timer_pause(spectrum_timer);
 }
 

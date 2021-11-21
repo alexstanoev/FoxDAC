@@ -74,23 +74,32 @@ static void buttons_read(void) {
                 break;
             case 1:
 
-                // spectrum to apple
+                // spectrum to eq
 
                 spectrum_stop();
-                badapple_start();
+                eq_curve_start();
 
                 cur_screen = 2;
                 break;
             case 2:
+
+                // eq to apple
+
+                eq_curve_stop();
+                badapple_start();
+
+                cur_screen = 3;
+                break;
+            case 3:
 
                 // apple to breakout
 
                 badapple_stop();
                 breakout_start();
 
-                cur_screen = 3;
+                cur_screen = 4;
                 break;
-            case 3:
+            case 4:
 
                 // breakout to main
 
@@ -115,10 +124,15 @@ static void buttons_read(void) {
         if(!btn_ok_press) {
             // ok pressed - toggle inputs
 
-            cur_input = (cur_input + 1) % INPUT_COUNT;
-            ui_select_input(cur_input);
+            if(lv_disp_get_scr_act(NULL) == EqCurve) {
+                // use the ok button to switch through EQ bands
+                eq_curve_next_band();
+            } else {
+                cur_input = (cur_input + 1) % INPUT_COUNT;
+                ui_select_input(cur_input);
 
-            wm8805_set_input(input_to_wm[cur_input]);
+                wm8805_set_input(input_to_wm[cur_input]);
+            }
         }
 
         btn_ok_press = 1;
@@ -167,6 +181,7 @@ void ui_init(void) {
     alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 5, lvgl_timer_cb, NULL, &lv_timer);
     alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 100, wm_timer_cb, NULL, &wm_timer);
 
+    eq_curve_init();
     spectrum_init();
     breakout_init();
 }

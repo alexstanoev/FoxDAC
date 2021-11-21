@@ -38,7 +38,7 @@ static char *descriptor_strings[] =
         "0123456789AB"
 };
 
-#define ENABLE_EQ 0
+#define ENABLE_EQ 1
 
 // todo fix these
 #define VENDOR_ID   0x2e8au

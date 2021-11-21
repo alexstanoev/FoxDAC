@@ -95,6 +95,11 @@ void biquad_eq_set_fs(int fs) {
     biquad_eq_update_coeffs();
 }
 
+void biquad_eq_set_stage_gain(uint8_t stage, float gain) {
+    if(stage >= NUM_EQ_STAGES) return;
+    freq_band_gains[stage] = gain;
+}
+
 //static int mulhs(int u, int v) {
 //    unsigned u0, v0, w0;
 //    int u1, v1, w1, w2, t;
