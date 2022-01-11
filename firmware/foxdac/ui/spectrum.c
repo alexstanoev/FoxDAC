@@ -17,7 +17,7 @@
 
 #include <arm_math.h>
 
-#define FFT_SIZE 128
+#define FFT_SIZE 1
 #define FFT_SIZE_F (128.0f)
 
 #define NUM_BARS 41
@@ -167,7 +167,7 @@ static void redraw_bars(lv_timer_t * timer) {
     lv_chart_refresh(chart);
 }
 
-void spectrum_init(void) {
+void spectrum_init(void) { return;
     fft_cfg = kiss_fftr_alloc(FFT_SIZE, false, fft_mem, &fft_mem_len);
 
     arm_status status = arm_rfft_init_q15(&fft_instance, FFT_SIZE, 0, 1);
@@ -210,14 +210,14 @@ void spectrum_init(void) {
     lv_timer_pause(spectrum_timer);
 }
 
-void spectrum_start(void) {
+void spectrum_start(void) { return;
     sample_buf_pos = 0;
     spectrum_running = 1;
     lv_scr_load_anim(Spectrum, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     lv_timer_resume(spectrum_timer);
 }
 
-void spectrum_stop(void) {
+void spectrum_stop(void) { return;
     spectrum_running = 0;
     //lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     lv_timer_pause(spectrum_timer);
