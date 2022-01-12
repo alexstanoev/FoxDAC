@@ -15,7 +15,6 @@
 
 #define FILTER_Q 0.707
 
-#define INPUT_SCALE_FACTOR 0x000065ac
 #define Q28_SCALE_FACTOR 268435456.0f
 #define COEFF_POSTSHIFT 3
 
@@ -29,8 +28,9 @@ static float freq_band_gains[NUM_EQ_STAGES] = { 0.0f };
 // b10 b11 b12 a11 a12 .. b20 b21
 static volatile q31_t freq_band_coeffs[5 * NUM_EQ_STAGES];
 
-// 4 vars * 2 channels * 10 bands
-static volatile q31_t biquad_state[4 * 2 * NUM_EQ_STAGES];
+// 4 vars * NUM_EQ_STAGES bands
+static volatile q31_t biquad_state_l[4 * NUM_EQ_STAGES];
+static volatile q31_t biquad_state_r[4 * NUM_EQ_STAGES];
 
 // Temp buffer for scaled-down samples
 static volatile q31_t samples32[TMP_BUFFER_LEN];
@@ -87,11 +87,10 @@ void biquad_eq_update_coeffs(void) {
     }
 
     // (re)init cascades
-    for(int i = 0; i < NUM_EQ_STAGES * 2; i += 2) {
-        for(int chan = 0; chan <= 1; chan++) {
-            memset((q31_t*) &biquad_state[4 * (i + chan)], 0, 4 * sizeof(q31_t));
-        }
-    }
+    memset((q31_t*) biquad_state_l, 0, 4 * NUM_EQ_STAGES * sizeof(q31_t));
+    memset((q31_t*) biquad_state_r, 0, 4 * NUM_EQ_STAGES * sizeof(q31_t));
+
+    __dmb();
 }
 
 void biquad_eq_set_fs(int fs) {
@@ -272,9 +271,9 @@ static void core1_irq_handler() {
         multicore_fifo_pop_blocking();
 
 #pragma GCC unroll 6
-        for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
-            biquad_step(samples32, samples32, &biquad_state[4 * (stage + 0)],
-                    &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], sample_cnt, RIGHT_CHANNEL);
+        for(int stage = 0; stage < NUM_EQ_STAGES; stage++) {
+            biquad_step(samples32, samples32, &biquad_state_l[4 * stage],
+                    &biquad_state_r[4 * stage], &freq_band_coeffs[stage * 5], sample_cnt, RIGHT_CHANNEL);
         }
     }
 
@@ -300,18 +299,22 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
       samples32[i] = samples32[i] >> 3;
     }
 
+    __dmb();
+
     multicore_fifo_push_blocking(0);
 
     // Run through all cascades
 #pragma GCC unroll 6
-    for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
-        biquad_step(samples32, samples32, &biquad_state[4 * (stage + 0)],
-                &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS
+    for(int stage = 0; stage < NUM_EQ_STAGES; stage++) {
+        biquad_step(samples32, samples32, &biquad_state_l[4 * stage],
+                &biquad_state_r[4 * stage], &freq_band_coeffs[stage * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS
     }
 
     while(multicore_fifo_rvalid()) {
         multicore_fifo_pop_blocking();
     }
+
+    __dmb();
 
     // Convert back to Q16
     for(int i = 0; i < len * 2; i++) {
