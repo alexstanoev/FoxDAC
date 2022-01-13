@@ -13,12 +13,11 @@
 #include "dac_lvgl_ui.h"
 #include "spectrum.h"
 
-#include "kissfft/kiss_fftr.h"
-
 #include <arm_math.h>
 
-#define FFT_SIZE 1
-#define FFT_SIZE_F (128.0f)
+// don't forget to enable ARM_TABLE_TWIDDLECOEF_Q15_x CMSISDSP/CommonTables/CMakeLists.txt
+#define FFT_SIZE 512
+#define FFT_SIZE_F (512.0f)
 
 #define NUM_BARS 41
 #define NUM_BARS_F 41.0f
@@ -34,16 +33,8 @@ static uint32_t sample_rate = 48000;
 static int interp_step = 0;
 static const int interp_times = 3;
 
-static uint16_t sample_buf[FFT_SIZE];
+static q15_t sample_buf[FFT_SIZE];
 static volatile int sample_buf_pos = 0;
-
-static kiss_fftr_cfg fft_cfg;
-static kiss_fft_scalar fft_in[FFT_SIZE];
-static kiss_fft_cpx fft_out[FFT_SIZE];
-
-#define FFT_MEM_LEN_BYTES 16384
-static uint8_t fft_mem[FFT_MEM_LEN_BYTES];
-static size_t fft_mem_len = FFT_MEM_LEN_BYTES;
 
 static lv_obj_t * chart;
 static lv_coord_t value_array[NUM_BARS];
@@ -55,17 +46,24 @@ static lv_timer_t * spectrum_timer;
 
 lv_obj_t * Spectrum;
 
-
 static arm_rfft_instance_q15 fft_instance;
 static q15_t fft_output[FFT_SIZE * 2];
 
+static q15_t window[FFT_SIZE];
 
-static float mapRange(float a1, float a2, float b1, float b2, float s) {
+static float remap(float a1, float a2, float b1, float b2, float s) {
     return b1 + (s - a1) * (b2 - b1) / (a2 - a1);
 }
 
-static float hanningWindow(short in, size_t i, size_t s) {
+static float hanning(short in, size_t i, size_t s) {
     return in * 0.5f * (1.0f - cosf(2.0f * ((float)M_PI) * (float)(i) / (float)(s - 1.0f)));
+}
+
+static void precompute_window(void) {
+    for(int i = 0; i < FFT_SIZE; i++) {
+        float wnd = hanning(1, i, FFT_SIZE);
+        window[i] = clip_q31_to_q15((q31_t) (wnd * 32768.0f));
+    }
 }
 
 // called from usb_spdif.c, runs in IRQ on core 0
@@ -87,8 +85,13 @@ void spectrum_consume_samples(int16_t* samples, uint32_t sample_count, uint32_t 
             sample_rate = rate;
         }
 
-        // average channels
-        sample_buf[sample_buf_pos++] = (samples[i] + samples[i + 1]) / 2;
+        // average channels and apply window
+        //q31_t channel_avg = (((q31_t) samples[i]) + ((q31_t) samples[i + 1])) >> 1;
+
+        // take only left channel
+        q31_t channel_avg = ((q31_t) samples[i]);
+
+        sample_buf[sample_buf_pos++] = clip_q31_to_q15((((q31_t) (window[i]) * (channel_avg)) >> 15));
 
         if(sample_buf_pos == FFT_SIZE) {
             return;
@@ -99,16 +102,15 @@ void spectrum_consume_samples(int16_t* samples, uint32_t sample_count, uint32_t 
 void spectrum_loop(void) {
     if(!spectrum_running || sample_buf_pos != FFT_SIZE || interp_step < interp_times) return;
 
-    // apply window
-    for (int i = 0; i < sample_buf_pos; i ++) {
-        fft_in[i] = hanningWindow((float) sample_buf[i], i, FFT_SIZE);
-    }
+    // TODO apply scaling properly - higher frequencies have less energy
 
-    //arm_rfft_q15(&fft_instance,(q15_t *) fft_in, fft_output);
-    //arm_abs_q15(fft_output, fft_output, FFT_SIZE);
+    arm_rfft_q15(&fft_instance, sample_buf, fft_output);
+    arm_cmplx_mag_q15(fft_output, fft_output, FFT_SIZE);
 
-    // compute FFT
-    kiss_fftr(fft_cfg, fft_in, fft_out);
+//    for (int i = 0; i < FFT_SIZE / 2; i++) {
+//        printf("%d\t", fft_output[i]);
+//    }
+//    printf("\n");
 
     for (int i = 0; i < NUM_BARS; i++) {
         // log scale, bins spaced at:
@@ -122,24 +124,25 @@ void spectrum_loop(void) {
         //printf("%d %f %f %d %d\n", i, bar_freq, bar_freq_next, startbin, endbin);
 
         // resolution at the first bars is too low, just draw some bins directly
-        if(startbin == 1 && endbin == 2) {
-            startbin = i;
-            endbin = i + 1;
-        }
+//        if(startbin == 1 && endbin == 2) {
+//            startbin = i;
+//            endbin = i + 1;
+//        }
 
         // rebin
         float power_sum = 0;
         for(int j = startbin; j < endbin; j++) {
-            power_sum += sqrtf(fft_out[j].r * fft_out[j].r + fft_out[j].i * fft_out[j].i) / FFT_SIZE_F;
+            power_sum += fft_output[j];
         }
 
-        power_sum = 20 * log10f(power_sum / (endbin - startbin));
+        power_sum = MIN(500.0f, (power_sum / (endbin - startbin)));
+        //power_sum = 20 * log10f(power_sum / (endbin - startbin));
 
         //float power = 20 * log10f(sqrtf(fft_out[i].r * fft_out[i].r + fft_out[i].i * fft_out[i].i) / FFT_SIZE_F);
 
         // 96dB dynamic range with 16 bits + fudge window loss
         old_value_array[i] = target_value_array[i];
-        target_value_array[i] = mapRange(0, 90, 0, 64, power_sum);
+        target_value_array[i] = remap(0, 500, 0, 64, power_sum);
     }
 
     interp_step = 0;
@@ -167,11 +170,12 @@ static void redraw_bars(lv_timer_t * timer) {
     lv_chart_refresh(chart);
 }
 
-void spectrum_init(void) { return;
-    fft_cfg = kiss_fftr_alloc(FFT_SIZE, false, fft_mem, &fft_mem_len);
+void spectrum_init(void) {
+    arm_rfft_init_q15(&fft_instance, FFT_SIZE, 0, 1);
+    // arm_status status
+    //printf("fft status %d\n", status);
 
-    arm_status status = arm_rfft_init_q15(&fft_instance, FFT_SIZE, 0, 1);
-    printf("fft status %d\n", status);
+    precompute_window();
 
     Spectrum = lv_obj_create(NULL);
 
@@ -210,14 +214,14 @@ void spectrum_init(void) { return;
     lv_timer_pause(spectrum_timer);
 }
 
-void spectrum_start(void) { return;
+void spectrum_start(void) {
     sample_buf_pos = 0;
     spectrum_running = 1;
     lv_scr_load_anim(Spectrum, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     lv_timer_resume(spectrum_timer);
 }
 
-void spectrum_stop(void) { return;
+void spectrum_stop(void) {
     spectrum_running = 0;
     //lv_scr_load_anim(MainUI, LV_SCR_LOAD_ANIM_NONE, 0, 0, false);
     lv_timer_pause(spectrum_timer);
