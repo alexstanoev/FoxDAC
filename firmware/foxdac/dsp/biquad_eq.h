@@ -12,6 +12,8 @@
 void biquad_eq_init(void);
 void biquad_eq_init_core1(void);
 void biquad_eq_update_coeffs(void);
+uint8_t biquad_eq_get_enabled(void);
+void biquad_eq_set_enabled(uint8_t enabled);
 void biquad_eq_set_fs(int fs);
 void biquad_eq_process_inplace(int16_t* samples, int16_t len);
 void biquad_eq_set_stage_gain(uint8_t stage, float gain);

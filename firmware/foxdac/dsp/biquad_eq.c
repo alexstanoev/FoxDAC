@@ -20,6 +20,8 @@
 
 #define TMP_BUFFER_LEN 384
 
+static uint8_t eq_enabled = 0;
+
 //static int freq_bands[NUM_EQ_STAGES] = { 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
 static int freq_bands[NUM_EQ_STAGES] = { 64, 125, 250, 500, 1000, 2000, 4000, 8000 };
 static float freq_band_gains[NUM_EQ_STAGES] = { 0.0f };
@@ -96,6 +98,14 @@ void biquad_eq_update_coeffs(void) {
 void biquad_eq_set_fs(int fs) {
     curr_fs = fs;
     biquad_eq_update_coeffs();
+}
+
+void biquad_eq_set_enabled(uint8_t enabled) {
+    eq_enabled = enabled;
+}
+
+uint8_t biquad_eq_get_enabled(void) {
+    return eq_enabled;
 }
 
 void biquad_eq_set_stage_gain(uint8_t stage, float gain) {
@@ -288,8 +298,11 @@ void biquad_eq_init_core1(void) {
 }
 
 void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
-    sample_cnt = len;
+    if(!eq_enabled) {
+        return;
+    }
 
+    sample_cnt = len;
     assert((sample_cnt * 2) <= TMP_BUFFER_LEN);
 
     // Scale down and convert to Q31

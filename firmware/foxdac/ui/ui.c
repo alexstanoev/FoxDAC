@@ -14,6 +14,8 @@
 #include "../drivers/ssd1306/ssd1306.h"
 #include "../drivers/encoder/encoder.h"
 
+#include "../dsp/biquad_eq.h"
+
 #include "lvgl/lvgl.h"
 #include "lv_port_disp.h"
 #include "lv_port_indev.h"
@@ -141,23 +143,29 @@ static void buttons_read(void) {
     }
 
     if(encoder_get_pressed()) {
-        uint32_t new_slider_value;
+        // encoder pressed - toggle mute
 
-        if(!tpa6130_get_muted()) {
-            prev_slider_value = (uint32_t)tpa6130_get_volume();
-            new_slider_value = 0;
+        if(lv_disp_get_scr_act(NULL) == EqCurve) {
+            // use the encoder button to toggle the EQ on/off
+            biquad_eq_set_enabled(!biquad_eq_get_enabled());
         } else {
-            new_slider_value = prev_slider_value;
-        }
+            uint32_t new_slider_value;
 
-        lv_slider_set_value(VolumeSlider, new_slider_value, LV_ANIM_ON);
-        lv_event_send(VolumeSlider, LV_EVENT_VALUE_CHANGED, NULL);
+            if(!tpa6130_get_muted()) {
+                prev_slider_value = (uint32_t)tpa6130_get_volume();
+                new_slider_value = 0;
+            } else {
+                new_slider_value = prev_slider_value;
+            }
+
+            lv_slider_set_value(VolumeSlider, new_slider_value, LV_ANIM_ON);
+            lv_event_send(VolumeSlider, LV_EVENT_VALUE_CHANGED, NULL);
+        }
     }
 }
 
 static bool lvgl_timer_cb(repeating_timer_t *rt) {
     do_lvgl_tick = 1;
-
     return true;
 }
 
@@ -192,12 +200,12 @@ void ui_loop(void) {
         wm8805_poll_intstat();
     }
 
+    spectrum_loop();
+    badapple_next_frame();
+
     if(do_lvgl_tick) {
         do_lvgl_tick = 0;
         buttons_read();
-        spectrum_loop();
         lv_task_handler();
     }
-
-     badapple_next_frame();
 }

@@ -15,14 +15,14 @@
 
 #include <arm_math.h>
 
-// don't forget to enable ARM_TABLE_TWIDDLECOEF_Q15_x CMSISDSP/CommonTables/CMakeLists.txt
+// don't forget to enable ARM_TABLE_TWIDDLECOEF_Q15_x in CMSISDSP/CommonTables/CMakeLists.txt
 #define FFT_SIZE 512
 #define FFT_SIZE_F (512.0f)
 
 #define NUM_BARS 41
 #define NUM_BARS_F 41.0f
 
-#define MIN_BAR_FREQ 50.0f
+#define MIN_BAR_FREQ 100.0f
 #define MAX_BAR_FREQ 20000.0f
 
 #define FFT_BIN_SIZE (sample_rate / FFT_SIZE)
@@ -44,12 +44,14 @@ static lv_coord_t old_value_array[NUM_BARS];
 
 static lv_timer_t * spectrum_timer;
 
-lv_obj_t * Spectrum;
-
 static arm_rfft_instance_q15 fft_instance;
 static q15_t fft_output[FFT_SIZE * 2];
 
 static q15_t window[FFT_SIZE];
+static int startbins[NUM_BARS];
+static int endbins[NUM_BARS];
+
+lv_obj_t * Spectrum;
 
 static float remap(float a1, float a2, float b1, float b2, float s) {
     return b1 + (s - a1) * (b2 - b1) / (a2 - a1);
@@ -59,10 +61,22 @@ static float hanning(short in, size_t i, size_t s) {
     return in * 0.5f * (1.0f - cosf(2.0f * ((float)M_PI) * (float)(i) / (float)(s - 1.0f)));
 }
 
-static void precompute_window(void) {
+static void init_tables(void) {
+    // precompute window
     for(int i = 0; i < FFT_SIZE; i++) {
         float wnd = hanning(1, i, FFT_SIZE);
         window[i] = clip_q31_to_q15((q31_t) (wnd * 32768.0f));
+    }
+
+    // precompute log bins
+    for (int i = 0; i < NUM_BARS; i++) {
+        // log scale, bins spaced at:
+        // min * (max/min) ^ x
+        float bar_freq = MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), i / NUM_BARS_F);
+        float bar_freq_next = ((i + 1) == NUM_BARS) ? MAX_BAR_FREQ : (MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), (i + 1) / NUM_BARS_F));
+
+        startbins[i] = floorf(bar_freq / FFT_BIN_SIZE);
+        endbins[i] = ceilf(bar_freq_next / FFT_BIN_SIZE);
     }
 }
 
@@ -91,7 +105,7 @@ void spectrum_consume_samples(int16_t* samples, uint32_t sample_count, uint32_t 
         // take only left channel
         q31_t channel_avg = ((q31_t) samples[i]);
 
-        sample_buf[sample_buf_pos++] = clip_q31_to_q15((((q31_t) (window[i]) * (channel_avg)) >> 15));
+        sample_buf[sample_buf_pos++] = clip_q31_to_q15((((q31_t) (window[sample_buf_pos]) * (channel_avg)) >> 15));
 
         if(sample_buf_pos == FFT_SIZE) {
             return;
@@ -115,19 +129,10 @@ void spectrum_loop(void) {
     for (int i = 0; i < NUM_BARS; i++) {
         // log scale, bins spaced at:
         // min * (max/min) ^ x
-        float bar_freq = MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), i / NUM_BARS_F);
-        float bar_freq_next = ((i + 1) == NUM_BARS) ? MAX_BAR_FREQ : (MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), (i + 1) / NUM_BARS_F));
-
-        int startbin = floorf(bar_freq / FFT_BIN_SIZE);
-        int endbin = ceilf(bar_freq_next / FFT_BIN_SIZE);
+        int startbin = startbins[i];
+        int endbin = endbins[i];
 
         //printf("%d %f %f %d %d\n", i, bar_freq, bar_freq_next, startbin, endbin);
-
-        // resolution at the first bars is too low, just draw some bins directly
-//        if(startbin == 1 && endbin == 2) {
-//            startbin = i;
-//            endbin = i + 1;
-//        }
 
         // rebin
         float power_sum = 0;
@@ -136,11 +141,9 @@ void spectrum_loop(void) {
         }
 
         power_sum = MIN(500.0f, (power_sum / (endbin - startbin)));
-        //power_sum = 20 * log10f(power_sum / (endbin - startbin));
 
         //float power = 20 * log10f(sqrtf(fft_out[i].r * fft_out[i].r + fft_out[i].i * fft_out[i].i) / FFT_SIZE_F);
 
-        // 96dB dynamic range with 16 bits + fudge window loss
         old_value_array[i] = target_value_array[i];
         target_value_array[i] = remap(0, 500, 0, 64, power_sum);
     }
@@ -175,7 +178,7 @@ void spectrum_init(void) {
     // arm_status status
     //printf("fft status %d\n", status);
 
-    precompute_window();
+    init_tables();
 
     Spectrum = lv_obj_create(NULL);
 
