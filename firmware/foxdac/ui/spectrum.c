@@ -73,7 +73,8 @@ static void init_tables(void) {
         // log scale, bins spaced at:
         // min * (max/min) ^ x
         float bar_freq = MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), i / NUM_BARS_F);
-        float bar_freq_next = ((i + 1) == NUM_BARS) ? MAX_BAR_FREQ : (MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), (i + 1) / NUM_BARS_F));
+        float bar_freq_next = ((i + 1) == NUM_BARS) ? MAX_BAR_FREQ
+                : (MIN_BAR_FREQ * powf((MAX_BAR_FREQ / MIN_BAR_FREQ), (i + 1) / NUM_BARS_F));
 
         startbins[i] = floorf(bar_freq / FFT_BIN_SIZE);
         endbins[i] = ceilf(bar_freq_next / FFT_BIN_SIZE);
@@ -118,13 +119,8 @@ void spectrum_loop(void) {
 
     // TODO apply scaling properly - higher frequencies have less energy
 
-    arm_rfft_q15(&fft_instance, sample_buf, fft_output);
-    arm_cmplx_mag_q15(fft_output, fft_output, FFT_SIZE);
-
-//    for (int i = 0; i < FFT_SIZE / 2; i++) {
-//        printf("%d\t", fft_output[i]);
-//    }
-//    printf("\n");
+    arm_rfft_q15(&fft_instance, sample_buf, fft_output); // 9.7
+    arm_cmplx_mag_q15(fft_output, fft_output, FFT_SIZE); // 10.6
 
     for (int i = 0; i < NUM_BARS; i++) {
         // log scale, bins spaced at:
@@ -132,20 +128,16 @@ void spectrum_loop(void) {
         int startbin = startbins[i];
         int endbin = endbins[i];
 
-        //printf("%d %f %f %d %d\n", i, bar_freq, bar_freq_next, startbin, endbin);
-
         // rebin
         float power_sum = 0;
         for(int j = startbin; j < endbin; j++) {
-            power_sum += fft_output[j];
+            power_sum += ((float) fft_output[j]) / 64.0f; // * 512 / 32768
         }
 
-        power_sum = MIN(500.0f, (power_sum / (endbin - startbin)));
-
-        //float power = 20 * log10f(sqrtf(fft_out[i].r * fft_out[i].r + fft_out[i].i * fft_out[i].i) / FFT_SIZE_F);
+        float power = 20.0f * log10f((power_sum / ((endbin - startbin) + 1)));
 
         old_value_array[i] = target_value_array[i];
-        target_value_array[i] = remap(0, 500, 0, 64, power_sum);
+        target_value_array[i] = remap(0, 32, 0, 64, power);
     }
 
     interp_step = 0;
