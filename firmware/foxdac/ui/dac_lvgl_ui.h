@@ -19,6 +19,7 @@ extern lv_obj_t * OpticalImg3;
 extern lv_obj_t * Logo;
 extern lv_obj_t * LogoImg;
 
+extern lv_obj_t * EqCurve;
 
 LV_IMG_DECLARE(img_speaker_png);   // assets/speaker.png
 LV_IMG_DECLARE(img_usb_png);   // assets/usb.png
@@ -34,6 +35,10 @@ void ui_select_input(uint8_t input);
 void ui_set_sr_text(const char* text);
 void ui_set_vol_text(const char* text);
 
+void eq_curve_init(void);
+void eq_curve_start(void);
+void eq_curve_stop(void);
+void eq_curve_next_band();
 
 #ifdef __cplusplus
 } /*extern "C"*/

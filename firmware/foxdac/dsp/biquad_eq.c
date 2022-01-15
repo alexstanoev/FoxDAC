@@ -15,9 +15,12 @@
 
 #define FILTER_Q 0.707
 
-#define INPUT_SCALE_FACTOR 0x000065ac
 #define Q28_SCALE_FACTOR 268435456.0f
 #define COEFF_POSTSHIFT 3
+
+#define TMP_BUFFER_LEN 384
+
+static uint8_t eq_enabled = 0;
 
 //static int freq_bands[NUM_EQ_STAGES] = { 32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000 };
 static int freq_bands[NUM_EQ_STAGES] = { 64, 125, 250, 500, 1000, 2000, 4000, 8000 };
@@ -27,12 +30,15 @@ static float freq_band_gains[NUM_EQ_STAGES] = { 0.0f };
 // b10 b11 b12 a11 a12 .. b20 b21
 static volatile q31_t freq_band_coeffs[5 * NUM_EQ_STAGES];
 
-// 4 vars * 2 channels * 10 bands
-static volatile q31_t biquad_state[4 * 2 * NUM_EQ_STAGES];
+// 4 vars * NUM_EQ_STAGES bands
+static volatile q31_t biquad_state_l[4 * NUM_EQ_STAGES];
+static volatile q31_t biquad_state_r[4 * NUM_EQ_STAGES];
+
+// Temp buffer for scaled-down samples
+static volatile q31_t samples32[TMP_BUFFER_LEN];
 
 static int curr_fs = 48000;
 
-volatile int16_t* core2_sample_buf;
 static volatile int sample_cnt = 0;
 
 typedef enum {
@@ -83,16 +89,28 @@ void biquad_eq_update_coeffs(void) {
     }
 
     // (re)init cascades
-    for(int i = 0; i < NUM_EQ_STAGES * 2; i += 2) {
-        for(int chan = 0; chan <= 1; chan++) {
-            memset((q31_t*) &biquad_state[4 * (i + chan)], 0, 4 * sizeof(q31_t));
-        }
-    }
+    memset((q31_t*) biquad_state_l, 0, 4 * NUM_EQ_STAGES * sizeof(q31_t));
+    memset((q31_t*) biquad_state_r, 0, 4 * NUM_EQ_STAGES * sizeof(q31_t));
+
+    __dmb();
 }
 
 void biquad_eq_set_fs(int fs) {
     curr_fs = fs;
     biquad_eq_update_coeffs();
+}
+
+void biquad_eq_set_enabled(uint8_t enabled) {
+    eq_enabled = enabled;
+}
+
+uint8_t biquad_eq_get_enabled(void) {
+    return eq_enabled;
+}
+
+void biquad_eq_set_stage_gain(uint8_t stage, float gain) {
+    if(stage >= NUM_EQ_STAGES) return;
+    freq_band_gains[stage] = gain;
 }
 
 //static int mulhs(int u, int v) {
@@ -170,7 +188,7 @@ static inline int mulhs(int a, int b) {
 //    return a;
 //}
 
-static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_t *pStateLeft,
+static void biquad_step(volatile q31_t *pIn, volatile q31_t *pOut, volatile q31_t *pStateLeft,
         volatile q31_t *pStateRight, volatile q31_t *pCoeffs, uint32_t blockSize, channel_sel_t channel_sel) {
     // Reading the coefficients
     const q31_t b0 = pCoeffs[0];
@@ -203,10 +221,7 @@ static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_
 #endif
 
         // Read the input
-        //q31_t Xn = ((q31_t) pIn[i]) << 16;
-
-        // Read and scale down a bit to avoid clipping EQ gain
-        q31_t Xn = ((((q31_t) pIn[i]) * INPUT_SCALE_FACTOR) >> 15) << 16;
+        q31_t Xn = pIn[i];
 
         // acc =  b0 * x[n] + b1 * x[n-1] + b2 * x[n-2] + a1 * y[n-1] + a2 * y[n-2]
         q31_t acc = mulhs(b0, Xn) + mulhs(b1, Xn1) + mulhs(b2, Xn2) + mulhs(a1, Yn1) + mulhs(a2, Yn2);
@@ -215,7 +230,7 @@ static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_
         acc = acc << COEFF_POSTSHIFT + 1;
 
         // Store output in destination buffer.
-        pOut[i] = (int16_t) (acc >> 16);
+        pOut[i] = acc;
 
         /* Every time after the output is computed state should be updated.
          * The states should be updated as:
@@ -248,8 +263,8 @@ static void biquad_step(volatile q15_t *pIn, volatile q15_t *pOut, volatile q31_
 
 void biquad_eq_init(void) {
     // TODO read stored gains
-    freq_band_gains[0] = 2;
-    freq_band_gains[1] = 2;
+    freq_band_gains[0] = 0;
+    freq_band_gains[1] = 0;
     freq_band_gains[2] = 0;
     freq_band_gains[3] = 0;
     freq_band_gains[4] = 0;
@@ -266,9 +281,9 @@ static void core1_irq_handler() {
         multicore_fifo_pop_blocking();
 
 #pragma GCC unroll 6
-        for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
-            biquad_step(core2_sample_buf, core2_sample_buf, &biquad_state[4 * (stage + 0)],
-                    &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], sample_cnt, RIGHT_CHANNEL);
+        for(int stage = 0; stage < NUM_EQ_STAGES; stage++) {
+            biquad_step(samples32, samples32, &biquad_state_l[4 * stage],
+                    &biquad_state_r[4 * stage], &freq_band_coeffs[stage * 5], sample_cnt, RIGHT_CHANNEL);
         }
     }
 
@@ -283,19 +298,39 @@ void biquad_eq_init_core1(void) {
 }
 
 void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
+    if(!eq_enabled) {
+        return;
+    }
+
     sample_cnt = len;
-    core2_sample_buf = samples;
+    assert((sample_cnt * 2) <= TMP_BUFFER_LEN);
+
+    // Scale down and convert to Q31
+    for(int i = 0; i < len * 2; i++) {
+      q31_t Xn = ((q31_t) samples[i]) << 14;
+      samples32[i] = mulhs(0x7FFFFFFF, Xn);
+      samples32[i] = samples32[i] >> 3;
+    }
+
+    __dmb();
 
     multicore_fifo_push_blocking(0);
 
     // Run through all cascades
 #pragma GCC unroll 6
-    for(int stage = 0; stage < NUM_EQ_STAGES * 2; stage += 2) {
-        biquad_step((volatile int16_t*) samples, (volatile int16_t*) samples, &biquad_state[4 * (stage + 0)],
-                &biquad_state[4 * (stage + 1)], &freq_band_coeffs[(stage / 2) * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS
+    for(int stage = 0; stage < NUM_EQ_STAGES; stage++) {
+        biquad_step(samples32, samples32, &biquad_state_l[4 * stage],
+                &biquad_state_r[4 * stage], &freq_band_coeffs[stage * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS
     }
 
     while(multicore_fifo_rvalid()) {
         multicore_fifo_pop_blocking();
+    }
+
+    __dmb();
+
+    // Convert back to Q16
+    for(int i = 0; i < len * 2; i++) {
+      samples[i] = clip_q31_to_q15(samples32[i] >> 14);
     }
 }
