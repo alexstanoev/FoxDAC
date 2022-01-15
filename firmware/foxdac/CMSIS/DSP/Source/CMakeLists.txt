@@ -30,9 +30,9 @@ option(HOST "Build for host" OFF)
 # by this cmake. So, enabling some functions may require to enable some
 # other ones.
 option(BASICMATH            "Basic Math Functions"              ON)
-option(COMPLEXMATH          "Complex Math Functions"            OFF)
+option(COMPLEXMATH          "Complex Math Functions"            ON)
 option(CONTROLLER           "Controller Functions"              OFF)
-option(FASTMATH             "Fast Math Functions"               OFF)
+option(FASTMATH             "Fast Math Functions"               ON)
 option(FILTERING            "Filtering Functions"               ON)
 option(MATRIX               "Matrix Functions"                  OFF)
 option(STATISTICS           "Statistics Functions"              OFF)
