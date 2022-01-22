@@ -22,13 +22,14 @@
 #define NUM_BARS 41
 #define NUM_BARS_F 41.0f
 
-#define MIN_BAR_FREQ 120.0f
+#define MIN_BAR_FREQ 80.0f
 #define MAX_BAR_FREQ 20000.0f
 
-#define FFT_BIN_SIZE (sample_rate / FFT_SIZE)
+//#define FFT_BIN_SIZE (sample_rate / (FFT_SIZE * 2))
+#define FFT_BIN_SIZE (sample_rate >> 11)
 
-#define BAR_MIN_DB 28
-#define BAR_MAX_DB 68
+#define BAR_MIN_DB 40
+#define BAR_MAX_DB 90
 
 static uint8_t spectrum_running = 0;
 static uint32_t sample_rate = 48000;
@@ -117,8 +118,7 @@ void spectrum_loop(void) {
     if(!spectrum_running || sample_buf_pos != FFT_SIZE || interp_step < interp_times) return;
 
     arm_rfft_q15(&fft_instance, sample_buf, fft_output);
-    //arm_cmplx_mag_q15(fft_output, fft_output, FFT_SIZE);
-    arm_cmplx_mag_squared_q15(fft_output, fft_output, FFT_SIZE);
+    arm_abs_q15(fft_output, fft_output, FFT_SIZE * 2);
 
     for (int i = 0; i < NUM_BARS; i++) {
         // log scale, bins spaced at:
@@ -126,17 +126,17 @@ void spectrum_loop(void) {
         int startbin = startbins[i];
         int endbin = endbins[i];
 
-        // rebin and get max amplitude for bucket
-        q31_t power_max = 0;
+        // rebin and get amplitude for bucket
+        q31_t bin_power = 0;
         for(int j = startbin; j < endbin; j++) {
-            power_max = MAX(power_max, fft_output[j]);
+            bin_power += fft_output[j];
+            //bin_power = MAX(bin_power, fft_output[j]);
         }
 
-        // TODO: scaling needs fixing, arbitrary currently
-        // small signals are getting lost somewhere
-        power_max = power_max << 5;
+        bin_power /= (endbin - startbin) + 1;
+        bin_power = bin_power << 3;
 
-        float power = 20.0f * log10f((float) power_max);
+        float power = 20.0f * log10f((float) bin_power);
 
         // clamp min
         power -= BAR_MIN_DB;
