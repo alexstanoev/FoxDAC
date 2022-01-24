@@ -23,6 +23,7 @@
 #include "ui.h"
 #include "spectrum.h"
 #include "dac_lvgl_ui.h"
+#include "persistent_storage.h"
 
 #define BTN_MENU 26
 #define BTN_OK   27
@@ -35,7 +36,7 @@ static void lv_init_ui(void) {
     lv_port_indev_init();
 }
 
-static repeating_timer_t lv_timer, wm_timer;
+static repeating_timer_t lv_timer, wm_timer, persist_timer;
 
 static void buttons_init(void) {
     gpio_init(BTN_MENU);
@@ -52,7 +53,7 @@ static uint8_t btn_ok_press = 0, btn_menu_press = 0;
 static uint8_t cur_input = 0, cur_screen = 0;
 static uint8_t input_to_wm[INPUT_COUNT] = { 3, 0, 1, 2 };
 
-static uint8_t do_wm_tick = 0, do_lvgl_tick = 0;
+static uint8_t do_wm_tick = 0, do_lvgl_tick = 0, do_persist_tick = 0;
 
 alarm_pool_t* core1_alarm_pool;
 
@@ -134,6 +135,8 @@ static void buttons_read(void) {
                 ui_select_input(cur_input);
 
                 wm8805_set_input(input_to_wm[cur_input]);
+
+                persist_write_byte(&input_file, cur_input);
             }
         }
 
@@ -164,6 +167,18 @@ static void buttons_read(void) {
     }
 }
 
+static void load_persistence(void) {
+    // last selected input
+    cur_input = persist_read_byte(&input_file, 0);
+    ui_select_input(cur_input);
+    wm8805_set_input(input_to_wm[cur_input]);
+
+    // last volume
+    int8_t vol = (int8_t) persist_read_byte(&vol_file, (uint8_t) tpa6130_get_volume());
+    lv_slider_set_value(VolumeSlider, vol, LV_ANIM_ON);
+    lv_event_send(VolumeSlider, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
 static bool lvgl_timer_cb(repeating_timer_t *rt) {
     do_lvgl_tick = 1;
     return true;
@@ -171,6 +186,11 @@ static bool lvgl_timer_cb(repeating_timer_t *rt) {
 
 static bool wm_timer_cb(repeating_timer_t *rt) {
     do_wm_tick = 1;
+    return true;
+}
+
+static bool persist_timer_cb(repeating_timer_t *rt) {
+    do_persist_tick = 1;
     return true;
 }
 
@@ -182,16 +202,19 @@ void ui_init(void) {
 
     DAC_BuildPages();
 
-    ui_select_input(0);
-    ui_set_vol_text(tpa6130_get_volume_str(10));
-
-    core1_alarm_pool = alarm_pool_create(1, 5);
+    core1_alarm_pool = alarm_pool_create(1, 8);
     alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 5, lvgl_timer_cb, NULL, &lv_timer);
     alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 100, wm_timer_cb, NULL, &wm_timer);
+    alarm_pool_add_repeating_timer_ms(core1_alarm_pool, 1000*60, persist_timer_cb, NULL, &persist_timer);
 
+    persist_init();
     eq_curve_init();
     spectrum_init();
     breakout_init();
+
+    load_persistence();
+    //ui_select_input(0);
+    //ui_set_vol_text(tpa6130_get_volume_str(10));
 }
 
 void ui_loop(void) {
@@ -207,5 +230,10 @@ void ui_loop(void) {
         do_lvgl_tick = 0;
         buttons_read();
         lv_task_handler();
+    }
+
+    if(do_persist_tick) {
+        do_persist_tick = 0;
+        persist_flush_all();
     }
 }

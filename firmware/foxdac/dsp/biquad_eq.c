@@ -280,7 +280,6 @@ static void core1_irq_handler() {
     while(multicore_fifo_rvalid()) {
         multicore_fifo_pop_blocking();
 
-#pragma GCC unroll 6
         for(int stage = 0; stage < NUM_EQ_STAGES; stage++) {
             biquad_step(samples32, samples32, &biquad_state_l[4 * stage],
                     &biquad_state_r[4 * stage], &freq_band_coeffs[stage * 5], sample_cnt, RIGHT_CHANNEL);
@@ -317,7 +316,6 @@ void biquad_eq_process_inplace(int16_t* samples, int16_t len) {
     multicore_fifo_push_blocking(0);
 
     // Run through all cascades
-#pragma GCC unroll 6
     for(int stage = 0; stage < NUM_EQ_STAGES; stage++) {
         biquad_step(samples32, samples32, &biquad_state_l[4 * stage],
                 &biquad_state_r[4 * stage], &freq_band_coeffs[stage * 5], len, LEFT_CHANNEL); // BOTH_CHANNELS

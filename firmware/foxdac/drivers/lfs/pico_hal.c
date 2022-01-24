@@ -19,7 +19,7 @@
 
 #include "pico_hal.h"
 
-#define FS_SIZE (32 * 1024)
+#define FS_SIZE (16 * 1024)
 
 static int pico_hal_read(lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size);
 static int pico_hal_prog(lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size);
@@ -44,7 +44,7 @@ struct lfs_config pico_cfg = {
     .prog_size = FLASH_PAGE_SIZE,
     .block_size = FLASH_SECTOR_SIZE,
     .block_count = FS_SIZE / FLASH_SECTOR_SIZE,
-    .cache_size = FLASH_SECTOR_SIZE / 4,
+    .cache_size = 256,
     .lookahead_size = 32,
     .block_cycles = 500};
 

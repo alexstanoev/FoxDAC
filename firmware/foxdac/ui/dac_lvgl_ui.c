@@ -1,5 +1,6 @@
 #include "dac_lvgl_ui.h"
 #include "lv_port_indev.h"
+#include "persistent_storage.h"
 
 #include "../drivers/tpa6130/tpa6130.h"
 
@@ -40,6 +41,8 @@ static void VolumeSlider_eventhandler(lv_event_t * event)
     tpa6130_set_volume(value);
 
     ui_set_vol_text(tpa6130_get_volume_str(value));
+
+    persist_write_byte(&vol_file, (uint8_t) value);
 }
 
 void UI_SetVolume(int32_t vol)
