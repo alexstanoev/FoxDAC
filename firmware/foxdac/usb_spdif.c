@@ -15,6 +15,7 @@
 #include "hardware/sync.h"
 #include "hardware/irq.h"
 #include "hardware/structs/bus_ctrl.h"
+#include "hardware/watchdog.h"
 #include "lufa/AudioClassCommon.h"
 
 #include "ui/ui.h"
@@ -714,6 +715,7 @@ struct audio_buffer_format producer_format = {
 // core 1 handles low-priority tasks: LVGL, OLED, WM8805 polling and TPA6130 volume
 
 static void core1_worker() {
+    watchdog_update();
     biquad_eq_init_core1();
 
     // Init the oled twice, in case the first time glitched
@@ -746,6 +748,7 @@ static void core1_worker() {
         }
 
         ui_loop();
+        watchdog_update();
 
         __wfe();
     }
@@ -809,6 +812,9 @@ int main(void) {
 
     // Debug UART
     stdout_uart_init();
+
+    // Watchdog @8.3sec (updated from core 1)
+    watchdog_enable(0x7fffff, 1);
 
     // Init H/W and USB audio
     core0_init();

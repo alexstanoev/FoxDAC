@@ -25,12 +25,6 @@
 #define TPA6130_OUTPUT_IMPEDANCE     0x3
 #define TPA6130_I2C_ADDRESS_VERSION  0x4
 
-/* Default register values after a reset */
-#define TPA6130_CONTROL_DEFAULT             0x00
-//#define TPA6130_VOLUME_AND_MUTE_DEFAULT   0xC0
-#define TPA6130_VOLUME_AND_MUTE_DEFAULT     0x0F
-#define TPA6130_OUTPUT_IMPEDANCE_DEFAULT    0x00
-#define TPA6130_I2C_ADDRESS_VERSION_DEFAULT 0x02
 /* Register bitfield macros */
 // Control register
 #define HP_EN_L          0x80

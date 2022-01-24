@@ -28,7 +28,7 @@
 //#define FFT_BIN_SIZE (sample_rate / (FFT_SIZE * 2))
 #define FFT_BIN_SIZE (sample_rate >> 11)
 
-#define BAR_MIN_DB 40
+#define BAR_MIN_DB 35
 #define BAR_MAX_DB 90
 
 static uint8_t spectrum_running = 0;
@@ -100,13 +100,14 @@ void spectrum_consume_samples(int16_t* samples, uint32_t sample_count, uint32_t 
             sample_rate = rate;
         }
 
-        // average channels and apply window
-        //q31_t channel_avg = (((q31_t) samples[i]) + ((q31_t) samples[i + 1])) >> 1;
+        // average both channels
+        q31_t channel_avg = (((q31_t) samples[i]) + ((q31_t) samples[i + 1])) >> 1;
 
         // take only left channel
-        q31_t channel_avg = ((q31_t) samples[i]);
+        //q31_t channel_avg = ((q31_t) samples[i]);
 
-        sample_buf[sample_buf_pos++] = clip_q31_to_q15((((q31_t) (window[sample_buf_pos]) * (channel_avg)) >> 15));
+        sample_buf[sample_buf_pos] = clip_q31_to_q15((((q31_t) (window[sample_buf_pos]) * (channel_avg)) >> 15));
+        sample_buf_pos++;
 
         if(sample_buf_pos == FFT_SIZE) {
             return;
