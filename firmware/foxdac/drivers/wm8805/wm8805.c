@@ -1,6 +1,8 @@
 /*
  * wm8805.c
  *
+ *  Based on http://www.dimdim.gr/diyaudio/spdif-receiver-with-the-wm8805/
+ *
  *  Created on: 30 Jul 2021
  *      Author: alex
  */
