@@ -11,6 +11,7 @@
 void oled_init(void);
 void ui_init(void);
 void ui_loop(void);
+void ui_update_activity(void);
 
 void badapple_start(void);
 void badapple_stop(void);

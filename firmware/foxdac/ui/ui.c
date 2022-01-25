@@ -7,6 +7,7 @@
 
 #include "pico/stdlib.h"
 #include "pico/time.h"
+#include "hardware/structs/usb.h"
 #include "hardware/i2c.h"
 
 #include "../drivers/wm8805/wm8805.h"
@@ -30,6 +31,8 @@
 
 #define INPUT_COUNT 4
 
+#define OLED_SUSPEND_TIMEOUT_MS (60 * 1000)
+
 static void lv_init_ui(void) {
     lv_init();
     lv_port_disp_init();
@@ -37,6 +40,23 @@ static void lv_init_ui(void) {
 }
 
 static repeating_timer_t lv_timer, wm_timer, persist_timer;
+
+static uint8_t btn_ok_press = 0, btn_menu_press = 0;
+
+static uint8_t cur_input = 0, cur_screen = 0;
+static uint8_t input_to_wm[INPUT_COUNT] = { 3, 0, 1, 2 };
+
+static uint8_t do_wm_tick = 0, do_lvgl_tick = 0, do_persist_tick = 0;
+
+static uint32_t prev_slider_value;
+static uint32_t last_activity_time = 0;
+
+volatile uint8_t ui_suspended = 0;
+alarm_pool_t* core1_alarm_pool;
+
+void ui_update_activity(void) {
+    last_activity_time = to_ms_since_boot(get_absolute_time());
+}
 
 static void buttons_init(void) {
     gpio_init(BTN_MENU);
@@ -47,17 +67,6 @@ static void buttons_init(void) {
     gpio_set_dir(BTN_OK, GPIO_IN);
     gpio_pull_up(BTN_OK);
 }
-
-static uint8_t btn_ok_press = 0, btn_menu_press = 0;
-
-static uint8_t cur_input = 0, cur_screen = 0;
-static uint8_t input_to_wm[INPUT_COUNT] = { 3, 0, 1, 2 };
-
-static uint8_t do_wm_tick = 0, do_lvgl_tick = 0, do_persist_tick = 0;
-
-alarm_pool_t* core1_alarm_pool;
-
-static uint32_t prev_slider_value;
 
 static void buttons_read(void) {
 
@@ -114,7 +123,7 @@ static void buttons_read(void) {
                 break;
             }
 
-
+            ui_update_activity();
         }
 
         btn_menu_press = 1;
@@ -138,6 +147,8 @@ static void buttons_read(void) {
 
                 persist_write_byte(&input_file, cur_input);
             }
+
+            ui_update_activity();
         }
 
         btn_ok_press = 1;
@@ -164,6 +175,8 @@ static void buttons_read(void) {
             lv_slider_set_value(VolumeSlider, new_slider_value, LV_ANIM_ON);
             lv_event_send(VolumeSlider, LV_EVENT_VALUE_CHANGED, NULL);
         }
+
+        ui_update_activity();
     }
 }
 
@@ -177,6 +190,41 @@ static void load_persistence(void) {
     int8_t vol = (int8_t) persist_read_byte(&vol_file, (uint8_t) tpa6130_get_volume());
     lv_slider_set_value(VolumeSlider, vol, LV_ANIM_ON);
     lv_event_send(VolumeSlider, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
+static void check_suspend(void) {
+    extern volatile uint8_t usb_host_seen;
+    static uint8_t prev_suspended = 1;
+    uint8_t usb_suspended = ((usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) != 0);
+
+    if(usb_suspended && !prev_suspended) {
+        // usb just suspended, force the screen to suspend
+        last_activity_time = 0;
+    } else if(!usb_suspended && prev_suspended) {
+        // waking up from suspend
+        ui_update_activity();
+    }
+
+    uint32_t idle_time = to_ms_since_boot(get_absolute_time()) - last_activity_time;
+
+    if(!ui_suspended && (usb_suspended || !usb_host_seen) && idle_time > OLED_SUSPEND_TIMEOUT_MS) {
+        // UI has been idle for OLED_SUSPEND_TIMEOUT_MS and there's no USB host -> suspend the oled
+        ssd1306_SetDisplayOn(0);
+        ui_suspended = 1;
+
+        // turn off underrun led
+        gpio_put(18, 0);
+
+        //if(cur_input == 0) {
+        //    ui_set_sr_text("NO HOST");
+        //}
+    } else if(ui_suspended && idle_time <= OLED_SUSPEND_TIMEOUT_MS) {
+        // if the UI is suspended but there has been activity, wake up
+        ssd1306_SetDisplayOn(1);
+        ui_suspended = 0;
+    }
+
+    prev_suspended = usb_suspended;
 }
 
 static bool lvgl_timer_cb(repeating_timer_t *rt) {
@@ -215,6 +263,8 @@ void ui_init(void) {
     load_persistence();
     //ui_select_input(0);
     //ui_set_vol_text(tpa6130_get_volume_str(10));
+
+    ui_update_activity();
 }
 
 void ui_loop(void) {
@@ -236,4 +286,6 @@ void ui_loop(void) {
         do_persist_tick = 0;
         persist_flush_all();
     }
+
+    check_suspend();
 }

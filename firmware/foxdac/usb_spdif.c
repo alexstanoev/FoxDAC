@@ -280,7 +280,7 @@ int overruns = 0;
 static volatile uint8_t sof_dma_buf[SOF_AVG_BUF_SIZE];
 static volatile uint8_t sof_dma_buf_pos = 0, sof_dma_buf_filled = 0;
 
-volatile uint8_t usb_host_seen = 0, ui_suspended = 0;
+volatile uint8_t usb_host_seen = 0;
 
 static volatile uint32_t rate = 48000;
 
@@ -727,26 +727,7 @@ static void core1_worker() {
     // Init LVGL and all screens
     ui_init();
 
-    // Start up the SPDIF PIO (core 1)
-    //irq_set_priority(DMA_IRQ_0 + PICO_AUDIO_SPDIF_DMA_IRQ, PICO_HIGHEST_IRQ_PRIORITY);
-    //audio_spdif_set_enabled(true);
-
     while(1) {
-        // suspend if we had inited usb once (otherwise can't distinguish between 5V only)
-        // TODO only do that if the USB input is selected?
-        if((usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) && usb_host_seen && !ui_suspended) {
-
-            ssd1306_SetDisplayOn(0);
-            ui_suspended = 1;
-
-            // turn off underrun led
-            gpio_put(18, 0);
-        } else if(!(usb_hw->sie_status & USB_SIE_STATUS_SUSPENDED_BITS) && usb_host_seen && ui_suspended) {
-            // waking up
-            ssd1306_SetDisplayOn(1);
-            ui_suspended = 0;
-        }
-
         ui_loop();
         watchdog_update();
 

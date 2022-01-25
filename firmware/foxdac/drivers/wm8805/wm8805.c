@@ -11,6 +11,7 @@
 #include <string.h>
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
+#include "../../ui/ui.h"
 #include "../../ui/dac_lvgl_ui.h"
 
 #define PIN_MISO 4
@@ -242,6 +243,8 @@ void wm8805_poll_intstat(void) {
                 //sr_str = "NO SPDIF";
                 ui_set_sr_text("NO SPDIF");
 
+                ui_update_activity();
+
                 // switch PLL coeffs around to try to find stable setting
 
 //                if (pll_mode) {
@@ -272,6 +275,7 @@ void wm8805_poll_intstat(void) {
         else {
             puts("S/PDIF PLL locked");
 
+            ui_update_activity();
 
             SPDSTAT = read_reg(12);
             int samplerate = 2*bitRead(SPDSTAT,5) + bitRead(SPDSTAT,4);      // calculate indicated rate
