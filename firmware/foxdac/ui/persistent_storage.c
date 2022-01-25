@@ -51,7 +51,7 @@ void persist_read(lfs_file_t* file, uint8_t* val, uint8_t* default_val, int len)
 
 void persist_write(lfs_file_t* file, uint8_t* val, int len) {
     lfs_file_rewind(file);
-    lfs_ssize_t read_sz = lfs_file_write(file, val, len);
+    lfs_file_write(file, val, len);
 }
 
 uint8_t persist_read_byte(lfs_file_t* file, uint8_t default_val) {
