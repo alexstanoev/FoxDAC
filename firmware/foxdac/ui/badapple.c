@@ -6,6 +6,7 @@
 
 #include "pico/time.h"
 #include "../drivers/ssd1306/ssd1306.h"
+#include "ui.h"
 
 #define BAD_APPLE 1
 
@@ -96,5 +97,6 @@ void badapple_next_frame(void) {
     }
 
     ssd1306_UpdateScreen();
+    ui_update_activity();
 }
 

@@ -207,20 +207,24 @@ static void check_suspend(void) {
 
     uint32_t idle_time = to_ms_since_boot(get_absolute_time()) - last_activity_time;
 
-    if(!ui_suspended && (usb_suspended || !usb_host_seen) && idle_time > OLED_SUSPEND_TIMEOUT_MS) {
+    if(!ui_suspended && idle_time > OLED_SUSPEND_TIMEOUT_MS) {
         // UI has been idle for OLED_SUSPEND_TIMEOUT_MS and there's no USB host -> suspend the oled
-        ssd1306_SetDisplayOn(0);
+
+        if((usb_suspended || !usb_host_seen)) {
+            ssd1306_SetDisplayOn(0);
+
+            // turn off underrun led
+            gpio_put(18, 0);
+        } else {
+            // USB host present, prevent burn-in
+            ssd1306_SetContrast(0x1F);
+        }
+
         ui_suspended = 1;
-
-        // turn off underrun led
-        gpio_put(18, 0);
-
-        //if(cur_input == 0) {
-        //    ui_set_sr_text("NO HOST");
-        //}
     } else if(ui_suspended && idle_time <= OLED_SUSPEND_TIMEOUT_MS) {
         // if the UI is suspended but there has been activity, wake up
         ssd1306_SetDisplayOn(1);
+        ssd1306_SetContrast(0xFF);
         ui_suspended = 0;
     }
 

@@ -12,6 +12,7 @@
 
 #include "dac_lvgl_ui.h"
 #include "spectrum.h"
+#include "ui.h"
 
 #include <arm_math.h>
 
@@ -153,6 +154,8 @@ void spectrum_loop(void) {
 
     interp_step = 0;
     sample_buf_pos = 0;
+
+    ui_update_activity();
 }
 
 // smoothstep lerp
