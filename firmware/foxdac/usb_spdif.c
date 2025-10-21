@@ -12,6 +12,7 @@
 #include "pico/audio.h"
 #include "pico/audio_spdif.h"
 #include "pico/multicore.h"
+#include "pico/unique_id.h"
 #include "hardware/sync.h"
 #include "hardware/irq.h"
 #include "hardware/structs/bus_ctrl.h"
@@ -36,7 +37,7 @@ static char *descriptor_strings[] =
 {
         "astanoev.com",
         "FoxDAC",
-        "0123456789AB"
+        "0123456789ABCDEF" //MUST be 16 chars
 };
 
 // todo fix these
@@ -748,6 +749,9 @@ void core0_init() {
     // Init red LED
     gpio_init(18);
     gpio_set_dir(18, GPIO_OUT);
+
+    //set serial number
+    pico_get_unique_board_id_string(descriptor_strings[2],17);
 
     // Grant high bus priority to the DMA
     bus_ctrl_hw->priority = BUSCTRL_BUS_PRIORITY_DMA_W_BITS | BUSCTRL_BUS_PRIORITY_DMA_R_BITS;
